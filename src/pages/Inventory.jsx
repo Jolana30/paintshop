@@ -409,107 +409,182 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
             <p>No products found matching filters.</p>
           </div>
         ) : (
-          <div className="table-responsive">
-            <table className="data-table inventory-table excel-ledger-table">
-              <thead>
-                <tr>
-                  <th>Part Code</th>
-                  <th>Product Description</th>
-                  <th>Size</th>
-                  <th className="text-center bg-gray-header">Opening Stock</th>
-                  <th className="text-center bg-green-header">+ Received</th>
-                  <th className="text-center bg-red-header">− Sold Today</th>
-                  <th className="text-center bg-blue-header">= Closing Stock</th>
-                  <th>Status</th>
-                  <th>Price (+15% VAT)</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredProducts.map(product => {
-                  const isOut = product.closingStock === 0;
-                  const isLow = product.closingStock <= product.minStock && !isOut;
+          <>
+            {/* Desktop & Tablet Table View */}
+            <div className="table-responsive desktop-only-table">
+              <table className="data-table inventory-table excel-ledger-table">
+                <thead>
+                  <tr>
+                    <th>Part Code</th>
+                    <th>Product Description</th>
+                    <th>Size</th>
+                    <th className="text-center bg-gray-header">Opening Stock</th>
+                    <th className="text-center bg-green-header">+ Received</th>
+                    <th className="text-center bg-red-header">− Sold Today</th>
+                    <th className="text-center bg-blue-header">= Closing Stock</th>
+                    <th>Status</th>
+                    <th>Price (+15% VAT)</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.map(product => {
+                    const isOut = product.closingStock === 0;
+                    const isLow = product.closingStock <= product.minStock && !isOut;
 
-                  return (
-                    <tr key={product.id} className={isOut ? 'row-out' : isLow ? 'row-low' : ''}>
-                      <td>
-                        <span className="font-mono text-xs product-code-badge">{product.code}</span>
-                      </td>
-                      <td>
-                        <div className="inventory-product-cell">
-                          <strong className="product-name-heading">{product.name}</strong>
-                          <span className="text-xs text-muted">{product.category}</span>
-                        </div>
-                      </td>
-                      <td>
+                    return (
+                      <tr key={product.id} className={isOut ? 'row-out' : isLow ? 'row-low' : ''}>
+                        <td>
+                          <span className="font-mono text-xs product-code-badge">{product.code}</span>
+                        </td>
+                        <td>
+                          <div className="inventory-product-cell">
+                            <strong className="product-name-heading">{product.name}</strong>
+                            <span className="text-xs text-muted">{product.category}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge-tag">{product.size}</span>
+                        </td>
+
+                        {/* Excel Style Daily Movement Columns */}
+                        <td className="text-center ledger-cell">
+                          <span className="opening-num">{product.openingStock}</span>
+                        </td>
+                        <td className="text-center ledger-cell">
+                          {product.stockInQty > 0 ? (
+                            <span className="badge-pill badge-healthy">+{product.stockInQty}</span>
+                          ) : (
+                            <span className="text-muted text-xs">0</span>
+                          )}
+                        </td>
+                        <td className="text-center ledger-cell">
+                          {product.soldQty > 0 ? (
+                            <span className="badge-pill badge-danger">−{product.soldQty}</span>
+                          ) : (
+                            <span className="text-muted text-xs">0</span>
+                          )}
+                        </td>
+                        <td className="text-center ledger-cell closing-cell">
+                          <strong className={`closing-num ${isOut ? 'text-danger' : isLow ? 'text-warning' : 'text-primary'}`}>
+                            {product.closingStock}
+                          </strong>
+                        </td>
+
+                        <td>
+                          {isOut ? (
+                            <span className="badge-pill badge-danger">OUT</span>
+                          ) : isLow ? (
+                            <span className="badge-pill badge-warning">LOW ({product.minStock} min)</span>
+                          ) : (
+                            <span className="badge-pill badge-healthy">OK</span>
+                          )}
+                        </td>
+                        <td>
+                          <strong>{formatCurrency(product.priceWithVat)}</strong>
+                        </td>
+                        <td>
+                          <div className="actions-cell-flex">
+                            <button
+                              type="button"
+                              className="btn-outline-xs"
+                              onClick={() => {
+                                if (onSelectStockInProduct) onSelectStockInProduct(product.id);
+                                setActiveTab('stockin');
+                              }}
+                              title="Receive stock"
+                            >
+                              + Stock
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-text-xs"
+                              onClick={() => openAdjustModal(product)}
+                              title="Manual inventory count adjustment"
+                            >
+                              Adjust
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Native Card Feed (iOS / Android) */}
+            <div className="mobile-only-cards">
+              {filteredProducts.map(product => {
+                const isOut = product.closingStock === 0;
+                const isLow = product.closingStock <= product.minStock && !isOut;
+
+                return (
+                  <div key={product.id} className={`mobile-product-card ${isOut ? 'card-out' : isLow ? 'card-low' : ''}`}>
+                    <div className="mpc-top">
+                      <div className="flex-items-center gap-2">
                         <span className="badge-tag">{product.size}</span>
-                      </td>
+                        <span className="font-mono text-xs product-code-badge">{product.code}</span>
+                      </div>
+                      <span className={`badge-pill ${isOut ? 'badge-danger' : isLow ? 'badge-warning' : 'badge-healthy'}`}>
+                        {isOut ? 'OUT' : isLow ? `LOW (min ${product.minStock})` : 'HEALTHY'}
+                      </span>
+                    </div>
 
-                      {/* Excel Style Daily Movement Columns */}
-                      <td className="text-center ledger-cell">
-                        <span className="opening-num">{product.openingStock}</span>
-                      </td>
-                      <td className="text-center ledger-cell">
-                        {product.stockInQty > 0 ? (
-                          <span className="badge-pill badge-healthy">+{product.stockInQty}</span>
-                        ) : (
-                          <span className="text-muted text-xs">0</span>
-                        )}
-                      </td>
-                      <td className="text-center ledger-cell">
-                        {product.soldQty > 0 ? (
-                          <span className="badge-pill badge-danger">−{product.soldQty}</span>
-                        ) : (
-                          <span className="text-muted text-xs">0</span>
-                        )}
-                      </td>
-                      <td className="text-center ledger-cell closing-cell">
-                        <strong className={`closing-num ${isOut ? 'text-danger' : isLow ? 'text-warning' : 'text-primary'}`}>
+                    <h4 className="mpc-name">{product.name}</h4>
+                    <div className="mpc-sub">
+                      <span>{product.category}</span>
+                      <span>•</span>
+                      <strong>{formatCurrency(product.priceWithVat)}</strong>
+                    </div>
+
+                    {/* Stock Reconciliation Grid */}
+                    <div className="mpc-ledger-grid">
+                      <div className="mpc-stat">
+                        <span className="mpc-label">Opening</span>
+                        <span className="mpc-val">{product.openingStock}</span>
+                      </div>
+                      <div className="mpc-stat">
+                        <span className="mpc-label">+ Recv</span>
+                        <span className="mpc-val text-success">+{product.stockInQty}</span>
+                      </div>
+                      <div className="mpc-stat">
+                        <span className="mpc-label">− Sold</span>
+                        <span className="mpc-val text-danger">−{product.soldQty}</span>
+                      </div>
+                      <div className="mpc-stat mpc-closing">
+                        <span className="mpc-label">= Closing</span>
+                        <span className={`mpc-val font-bold ${isOut ? 'text-danger' : isLow ? 'text-warning' : 'text-primary'}`}>
                           {product.closingStock}
-                        </strong>
-                      </td>
+                        </span>
+                      </div>
+                    </div>
 
-                      <td>
-                        {isOut ? (
-                          <span className="badge-pill badge-danger">OUT</span>
-                        ) : isLow ? (
-                          <span className="badge-pill badge-warning">LOW ({product.minStock} min)</span>
-                        ) : (
-                          <span className="badge-pill badge-healthy">OK</span>
-                        )}
-                      </td>
-                      <td>
-                        <strong>{formatCurrency(product.priceWithVat)}</strong>
-                      </td>
-                      <td>
-                        <div className="actions-cell-flex">
-                          <button
-                            type="button"
-                            className="btn-outline-xs"
-                            onClick={() => {
-                              if (onSelectStockInProduct) onSelectStockInProduct(product.id);
-                              setActiveTab('stockin');
-                            }}
-                            title="Receive stock"
-                          >
-                            + Stock
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-text-xs"
-                            onClick={() => openAdjustModal(product)}
-                            title="Manual inventory count adjustment"
-                          >
-                            Adjust
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    {/* Touch Friendly Action Buttons */}
+                    <div className="mpc-actions">
+                      <button
+                        type="button"
+                        className="btn-mpc-stock"
+                        onClick={() => {
+                          if (onSelectStockInProduct) onSelectStockInProduct(product.id);
+                          setActiveTab('stockin');
+                        }}
+                      >
+                        + Receive Stock
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-mpc-adjust"
+                        onClick={() => openAdjustModal(product)}
+                      >
+                        Adjust Count
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 

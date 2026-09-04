@@ -157,72 +157,125 @@ export default function Sales({ setActiveTab }) {
             </button>
           </div>
         ) : (
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Receipt #</th>
-                  <th>Date & Time</th>
-                  <th>Customer</th>
-                  <th>Items Breakdown</th>
-                  <th>Total Units</th>
-                  <th>Sale Total</th>
-                  <th>Receipt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredSales.map((sale, index) => {
-                  const dt = new Date(sale.timestamp);
-                  const isRecent = index === 0 && (Date.now() - dt.getTime() < 1000 * 60 * 10);
-                  return (
-                    <tr key={sale.id} className={isRecent ? 'row-recently-recorded' : ''}>
-                      <td>
-                        <strong className="text-primary font-mono">{sale.id}</strong>
+          <>
+            {/* Desktop Table */}
+            <div className="table-responsive desktop-only-table">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Receipt #</th>
+                    <th>Date & Time</th>
+                    <th>Customer</th>
+                    <th>Items Breakdown</th>
+                    <th>Total Units</th>
+                    <th>Sale Total</th>
+                    <th>Receipt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSales.map((sale, index) => {
+                    const dt = new Date(sale.timestamp);
+                    const isRecent = index === 0 && (Date.now() - dt.getTime() < 1000 * 60 * 10);
+                    return (
+                      <tr key={sale.id} className={isRecent ? 'row-recently-recorded' : ''}>
+                        <td>
+                          <strong className="text-primary font-mono">{sale.id}</strong>
+                          {isRecent && (
+                            <span className="badge-pill badge-healthy" style={{ marginLeft: '6px', fontSize: '10px' }}>
+                              JUST RECORDED
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="text-sm">
+                            <div>{dt.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                            <div className="text-xs text-muted">{dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge-pill badge-neutral">{sale.customer}</span>
+                        </td>
+                        <td>
+                          <div className="line-items-summary">
+                            {sale.items.map((item, idx) => (
+                              <div key={idx} className="item-summary-line">
+                                <strong>{item.quantity}x</strong> {item.productName} ({item.size}) — {formatCurrency(item.subtotal)}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                        <td>
+                          <strong>{sale.totalItems}</strong>
+                        </td>
+                        <td>
+                          <strong className="text-success text-md">{formatCurrency(sale.total)}</strong>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn-outline-xs"
+                            onClick={() => setSelectedSale(sale)}
+                          >
+                            View Receipt
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Native Transaction Cards */}
+            <div className="mobile-only-cards">
+              {filteredSales.map((sale, index) => {
+                const dt = new Date(sale.timestamp);
+                const isRecent = index === 0 && (Date.now() - dt.getTime() < 1000 * 60 * 10);
+                return (
+                  <div key={sale.id} className={`mobile-sale-card ${isRecent ? 'card-recently-recorded' : ''}`}>
+                    <div className="msc-header">
+                      <div>
+                        <strong className="msc-id font-mono">{sale.id}</strong>
                         {isRecent && (
-                          <span className="badge-pill badge-healthy" style={{ marginLeft: '6px', fontSize: '10px' }}>
-                            JUST RECORDED
+                          <span className="badge-pill badge-healthy ml-2" style={{ fontSize: '10px', padding: '0.15rem 0.4rem' }}>
+                            NEW
                           </span>
                         )}
-                      </td>
-                      <td>
-                        <div className="text-sm">
-                          <div>{dt.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                          <div className="text-xs text-muted">{dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                        <span className="msc-customer">{sale.customer}</span>
+                      </div>
+                      <div className="msc-time">
+                        <span>{dt.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                        <small>{dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
+                      </div>
+                    </div>
+
+                    <div className="msc-items">
+                      {sale.items.map((item, idx) => (
+                        <div key={idx} className="msc-item-line">
+                          <span><strong>{item.quantity}x</strong> {item.productName} ({item.size})</span>
+                          <span className="text-muted">{formatCurrency(item.subtotal)}</span>
                         </div>
-                      </td>
-                      <td>
-                        <span className="badge-pill badge-neutral">{sale.customer}</span>
-                      </td>
-                      <td>
-                        <div className="line-items-summary">
-                          {sale.items.map((item, idx) => (
-                            <div key={idx} className="item-summary-line">
-                              <strong>{item.quantity}x</strong> {item.productName} ({item.size}) — {formatCurrency(item.subtotal)}
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-                      <td>
-                        <strong>{sale.totalItems}</strong>
-                      </td>
-                      <td>
-                        <strong className="text-success text-md">{formatCurrency(sale.total)}</strong>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn-outline-xs"
-                          onClick={() => setSelectedSale(sale)}
-                        >
-                          View Receipt
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                      ))}
+                    </div>
+
+                    <div className="msc-footer">
+                      <div className="msc-total-block">
+                        <span className="msc-items-count">{sale.totalItems} unit(s) total</span>
+                        <strong className="msc-total-val text-success">{formatCurrency(sale.total)}</strong>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-msc-receipt"
+                        onClick={() => setSelectedSale(sale)}
+                      >
+                        Receipt ➔
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 

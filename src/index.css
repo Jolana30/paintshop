@@ -69,9 +69,22 @@ button {
   cursor: pointer;
   outline: none;
   transition: all 0.15s ease-in-out;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+button:active {
+  transform: scale(0.97);
 }
 
 input, select, textarea {
   font-family: inherit;
-  font-size: 14px;
+  font-size: 16px; /* 16px baseline prevents unwanted iOS Safari page auto-zoom */
+}
+
+@media (min-width: 861px) {
+  input, select, textarea {
+    font-size: 14px;
+  }
 }

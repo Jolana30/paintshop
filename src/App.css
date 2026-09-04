@@ -1940,3 +1940,286 @@
     transform: rotate(90deg);
   }
 }
+
+/* ==========================================================================
+   Dual Mode: Desktop Table vs Native Mobile Cards (10/10 Mobile Experience)
+   ========================================================================== */
+.mobile-only-cards {
+  display: none;
+}
+
+.desktop-only-table {
+  display: block;
+}
+
+@media (max-width: 860px) {
+  .mobile-only-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-top: 0.5rem;
+  }
+
+  .desktop-only-table {
+    display: none !important;
+  }
+
+  /* Prevent iOS Safari input auto-zoom */
+  .form-input, .form-select, .search-input, .quantity-large-input, .qty-input {
+    font-size: 16px !important;
+  }
+
+  /* Mobile Inventory Card */
+  .mobile-product-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .mobile-product-card.card-out {
+    border-left: 4px solid var(--danger);
+    background-color: #fffafb;
+  }
+
+  .mobile-product-card.card-low {
+    border-left: 4px solid var(--warning);
+    background-color: #fffdf7;
+  }
+
+  .mpc-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .mpc-name {
+    font-size: 0.96rem;
+    font-weight: 700;
+    color: var(--text-main);
+    line-height: 1.25;
+  }
+
+  .mpc-sub {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  .mpc-sub strong {
+    color: var(--primary);
+  }
+
+  .mpc-ledger-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background-color: var(--bg-surface-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem 0.4rem;
+    text-align: center;
+    gap: 0.25rem;
+  }
+
+  .mpc-stat {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mpc-stat.mpc-closing {
+    border-left: 1px solid var(--border-color);
+    padding-left: 0.25rem;
+  }
+
+  .mpc-label {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .mpc-val {
+    font-size: 0.95rem;
+    font-weight: 700;
+  }
+
+  .mpc-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+  }
+
+  .btn-mpc-stock {
+    background-color: var(--primary);
+    color: white;
+    font-size: 0.86rem;
+    font-weight: 700;
+    padding: 0.7rem;
+    border-radius: var(--radius-sm);
+    text-align: center;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .btn-mpc-adjust {
+    background-color: var(--bg-surface-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    font-size: 0.86rem;
+    font-weight: 600;
+    padding: 0.7rem;
+    border-radius: var(--radius-sm);
+    text-align: center;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Mobile Sales Card */
+  .mobile-sale-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .mobile-sale-card.card-recently-recorded {
+    border-left: 4px solid var(--success);
+    background-color: #f0fdf4;
+  }
+
+  .msc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .msc-id {
+    font-size: 0.95rem;
+    color: var(--primary);
+  }
+
+  .msc-customer {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .msc-time {
+    text-align: right;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+
+  .msc-time small {
+    display: block;
+    color: var(--text-light);
+  }
+
+  .msc-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    background: var(--bg-surface-secondary);
+    padding: 0.65rem 0.75rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+  }
+
+  .msc-item-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.82rem;
+  }
+
+  .msc-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.25rem;
+  }
+
+  .msc-total-block {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .msc-items-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .msc-total-val {
+    font-size: 1.15rem;
+  }
+
+  .btn-msc-receipt {
+    background-color: var(--primary-subtle);
+    border: 1px solid #bfdbfe;
+    color: var(--primary);
+    font-size: 0.84rem;
+    font-weight: 700;
+    padding: 0.6rem 0.95rem;
+    border-radius: var(--radius-sm);
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* Mobile Low Stock Card */
+  .mobile-low-stock-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--danger);
+    border-radius: var(--radius);
+    padding: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  /* Touch Stepper Sizing (44px standard) */
+  .stepper-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .qty-btn {
+    width: 38px;
+    height: 38px;
+  }
+
+  .qty-input {
+    width: 42px;
+    font-size: 1rem;
+  }
+
+  /* Quick chips touch target */
+  .quick-qty-btn {
+    min-height: 38px;
+    min-width: 44px;
+    font-size: 0.88rem;
+  }
+
+  /* Safe area padding adjustments for modal */
+  .modal-box {
+    max-height: 88vh;
+    overflow-y: auto;
+    margin: 1rem;
+  }
+}

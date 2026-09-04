@@ -145,56 +145,90 @@ export default function Dashboard({ setActiveTab, onSelectStockInProduct }) {
             </button>
           </div>
 
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Size</th>
-                  <th>Current Stock</th>
-                  <th>Min Level</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lowStockProducts.map(p => (
-                  <tr key={p.id}>
-                    <td>
-                      <div className="product-title-cell">
-                        <span className="product-name">{p.name}</span>
-                        <span className="product-code">{p.code}</span>
-                      </div>
-                    </td>
-                    <td><span className="badge-tag">{p.size}</span></td>
-                    <td>
-                      <span className="stock-number text-danger font-bold">
-                        {p.stock} units
-                      </span>
-                    </td>
-                    <td className="text-muted">{p.minStock} units</td>
-                    <td>
-                      <span className="badge-pill badge-danger">
-                        {p.stock === 0 ? 'OUT OF STOCK' : 'LOW STOCK'}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn-sm btn-primary"
-                        onClick={() => {
-                          if (onSelectStockInProduct) onSelectStockInProduct(p.id);
-                          setActiveTab('stockin');
-                        }}
-                      >
-                        + Stock In
-                      </button>
-                    </td>
+          <>
+            {/* Desktop Low Stock Table */}
+            <div className="table-responsive desktop-only-table">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Product</th>
+                    <th>Size</th>
+                    <th>Current Stock</th>
+                    <th>Min Level</th>
+                    <th>Status</th>
+                    <th>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {lowStockProducts.map(p => (
+                    <tr key={p.id}>
+                      <td>
+                        <div className="product-title-cell">
+                          <span className="product-name">{p.name}</span>
+                          <span className="product-code">{p.code}</span>
+                        </div>
+                      </td>
+                      <td><span className="badge-tag">{p.size}</span></td>
+                      <td>
+                        <span className="stock-number text-danger font-bold">
+                          {p.stock} units
+                        </span>
+                      </td>
+                      <td className="text-muted">{p.minStock} units</td>
+                      <td>
+                        <span className="badge-pill badge-danger">
+                          {p.stock === 0 ? 'OUT OF STOCK' : 'LOW STOCK'}
+                        </span>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-sm btn-primary"
+                          onClick={() => {
+                            if (onSelectStockInProduct) onSelectStockInProduct(p.id);
+                            setActiveTab('stockin');
+                          }}
+                        >
+                          + Stock In
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Low Stock Cards */}
+            <div className="mobile-only-cards">
+              {lowStockProducts.map(p => (
+                <div key={p.id} className="mobile-low-stock-card">
+                  <div className="flex-items-center justify-between">
+                    <span className="badge-tag">{p.size}</span>
+                    <span className="badge-pill badge-danger">{p.stock === 0 ? 'OUT' : 'LOW'}</span>
+                  </div>
+                  <strong className="text-sm mt-1">{p.name}</strong>
+                  <div className="text-xs text-muted font-mono">{p.code}</div>
+                  <div className="flex-items-center justify-between mt-2 pt-2 border-top">
+                    <div>
+                      <span className="text-xs text-muted">Current: </span>
+                      <strong className="text-danger">{p.stock} units</strong>
+                      <span className="text-xs text-muted"> (min {p.minStock})</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn-outline-xs"
+                      onClick={() => {
+                        if (onSelectStockInProduct) onSelectStockInProduct(p.id);
+                        setActiveTab('stockin');
+                      }}
+                    >
+                      + Receive
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         </div>
       )}
 
@@ -219,45 +253,77 @@ export default function Dashboard({ setActiveTab, onSelectStockInProduct }) {
             <p>No sales recorded yet.</p>
           </div>
         ) : (
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Receipt #</th>
-                  <th>Time</th>
-                  <th>Items Purchased</th>
-                  <th>Total Units</th>
-                  <th>Total (ETB)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentSales.map(sale => (
-                  <tr key={sale.id}>
-                    <td>
-                      <strong className="text-primary">{sale.id}</strong>
-                      <div className="text-xs text-muted">{sale.customer}</div>
-                    </td>
-                    <td className="text-muted">
-                      {new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </td>
-                    <td>
-                      <div className="line-items-summary">
-                        {sale.items.map((item, idx) => (
-                          <span key={idx} className="item-chip">
-                            {item.quantity}x {item.productName} ({item.size})
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td><strong>{sale.totalItems}</strong></td>
-                    <td>
-                      <strong className="text-success text-md">{formatCurrency(sale.total)}</strong>
-                    </td>
+          <>
+            {/* Desktop Table */}
+            <div className="table-responsive desktop-only-table">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Receipt #</th>
+                    <th>Time</th>
+                    <th>Items Purchased</th>
+                    <th>Total Units</th>
+                    <th>Total (ETB)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {recentSales.map(sale => (
+                    <tr key={sale.id}>
+                      <td>
+                        <strong className="text-primary">{sale.id}</strong>
+                        <div className="text-xs text-muted">{sale.customer}</div>
+                      </td>
+                      <td className="text-muted">
+                        {new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                      <td>
+                        <div className="line-items-summary">
+                          {sale.items.map((item, idx) => (
+                            <span key={idx} className="item-chip">
+                              {item.quantity}x {item.productName} ({item.size})
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td><strong>{sale.totalItems}</strong></td>
+                      <td>
+                        <strong className="text-success text-md">{formatCurrency(sale.total)}</strong>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Recent Sales Cards */}
+            <div className="mobile-only-cards">
+              {recentSales.map(sale => (
+                <div key={sale.id} className="mobile-sale-card" onClick={() => setActiveTab('sales')} style={{ cursor: 'pointer' }}>
+                  <div className="msc-header">
+                    <div>
+                      <strong className="msc-id font-mono">{sale.id}</strong>
+                      <span className="msc-customer">{sale.customer}</span>
+                    </div>
+                    <span className="text-xs text-muted">
+                      {new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div className="msc-items">
+                    {sale.items.map((item, idx) => (
+                      <div key={idx} className="msc-item-line">
+                        <span><strong>{item.quantity}x</strong> {item.productName} ({item.size})</span>
+                        <span className="text-muted">{formatCurrency(item.subtotal)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="msc-footer">
+                    <span className="text-xs text-muted">{sale.totalItems} unit(s)</span>
+                    <strong className="text-success">{formatCurrency(sale.total)}</strong>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
