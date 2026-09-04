@@ -26,6 +26,42 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
     return ['ALL', ...Array.from(new Set(products.map(p => p.category)))];
   }, [products]);
 
+  // Dynamic breakdown of units by category
+  const categoryStats = useMemo(() => {
+    const stats = {
+      ALL: { units: 0, count: products.length }
+    };
+    products.forEach(p => {
+      stats.ALL.units += p.stock;
+      if (!stats[p.category]) {
+        stats[p.category] = { units: 0, count: 0 };
+      }
+      stats[p.category].units += p.stock;
+      stats[p.category].count += 1;
+    });
+    return stats;
+  }, [products]);
+
+  // Context-aware totals (matches active category selection)
+  const activeProductsByCategory = useMemo(() => {
+    return selectedCategory === 'ALL'
+      ? products
+      : products.filter(p => p.category === selectedCategory);
+  }, [products, selectedCategory]);
+
+  const activeUnits = useMemo(() => {
+    return activeProductsByCategory.reduce((sum, p) => sum + p.stock, 0);
+  }, [activeProductsByCategory]);
+
+  const activeValue = useMemo(() => {
+    return activeProductsByCategory.reduce((sum, p) => sum + (p.stock * p.priceWithVat), 0);
+  }, [activeProductsByCategory]);
+
+  const mostAvailableProduct = useMemo(() => {
+    const sorted = [...activeProductsByCategory].sort((a, b) => b.stock - a.stock);
+    return sorted.length > 0 && sorted[0].stock > 0 ? sorted[0] : null;
+  }, [activeProductsByCategory]);
+
   // Overall totals
   const totalUnits = useMemo(() => products.reduce((sum, p) => sum + p.stock, 0), [products]);
   const totalValue = useMemo(() => products.reduce((sum, p) => sum + (p.stock * p.priceWithVat), 0), [products]);
@@ -176,16 +212,36 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
         </div>
       </div>
 
-      {/* 3 Simple Snapshot Cards */}
+      {/* 4 Clean Snapshot Cards */}
       <div className="simple-summary-row">
         <div className="simple-stat-box">
-          <span className="simple-stat-label">Total Units in Shop</span>
-          <strong className="simple-stat-val text-primary">{totalUnits} units</strong>
+          <span className="simple-stat-label">
+            {selectedCategory === 'ALL' ? 'Total Shop Units' : `${selectedCategory} Units`}
+          </span>
+          <strong className="simple-stat-val text-primary">{activeUnits} units</strong>
         </div>
+
         <div className="simple-stat-box">
-          <span className="simple-stat-label">Total Inventory Valuation</span>
-          <strong className="simple-stat-val text-success">{formatCurrency(totalValue)}</strong>
+          <span className="simple-stat-label">
+            {selectedCategory === 'ALL' ? 'Total Shop Valuation' : `${selectedCategory} Value`}
+          </span>
+          <strong className="simple-stat-val text-success">{formatCurrency(activeValue)}</strong>
         </div>
+
+        <div className="simple-stat-box">
+          <span className="simple-stat-label">Most Available Paint</span>
+          {mostAvailableProduct ? (
+            <div className="most-avail-preview">
+              <strong className="simple-stat-val text-accent">{mostAvailableProduct.stock} units</strong>
+              <span className="text-xs text-muted truncate-1-line" title={mostAvailableProduct.name}>
+                {mostAvailableProduct.name} ({mostAvailableProduct.size})
+              </span>
+            </div>
+          ) : (
+            <strong className="simple-stat-val text-muted">None</strong>
+          )}
+        </div>
+
         <div className="simple-stat-box">
           <span className="simple-stat-label">Low / Out of Stock</span>
           <strong className={`simple-stat-val ${lowStockProducts.length > 0 ? 'text-warning' : 'text-muted'}`}>
@@ -219,16 +275,19 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
 
         {/* Category Horizontal Chips */}
         <div className="category-chips-container">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setSelectedCategory(cat)}
-              className={`chip-btn ${selectedCategory === cat ? 'active' : ''}`}
-            >
-              {cat}
-            </button>
-          ))}
+          {categories.map(cat => {
+            const stat = categoryStats[cat] || { units: 0, count: 0 };
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`chip-btn ${selectedCategory === cat ? 'active' : ''}`}
+              >
+                {cat === 'ALL' ? 'All' : cat} ({stat.units} units)
+              </button>
+            );
+          })}
         </div>
 
         {/* Status Pills */}

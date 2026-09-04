@@ -2229,9 +2229,32 @@
    ========================================================================== */
 .simple-summary-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
   margin-bottom: 1.25rem;
+}
+
+@media (max-width: 1024px) {
+  .simple-summary-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.most-avail-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.text-accent {
+  color: #0284c7;
+}
+
+.truncate-1-line {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .simple-stat-box {
