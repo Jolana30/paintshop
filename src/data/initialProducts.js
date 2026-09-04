@@ -20,7 +20,7 @@ export const initialProducts = [
     size: "13.5L",
     priceBeforeVat: 17170.00,
     priceWithVat: 19745.50,
-    stock: 0,
+    stock: 45,
     minStock: 4,
   },
   {
@@ -31,7 +31,7 @@ export const initialProducts = [
     size: "2.7L",
     priceBeforeVat: 4040.00,
     priceWithVat: 4646.00,
-    stock: 0,
+    stock: 20,
     minStock: 5,
   },
   {
@@ -42,7 +42,7 @@ export const initialProducts = [
     size: "13.5L",
     priceBeforeVat: 14948.00,
     priceWithVat: 17190.20,
-    stock: 0,
+    stock: 8,
     minStock: 3,
   },
   {
@@ -75,7 +75,7 @@ export const initialProducts = [
     size: "3L",
     priceBeforeVat: 4545.00,
     priceWithVat: 5226.75,
-    stock: 0,
+    stock: 1,
     minStock: 6,
   },
   {
@@ -86,7 +86,7 @@ export const initialProducts = [
     size: "15L",
     priceBeforeVat: 17927.50,
     priceWithVat: 20616.63,
-    stock: 0,
+    stock: 28,
     minStock: 4,
   },
   {
@@ -108,7 +108,7 @@ export const initialProducts = [
     size: "13.5L",
     priceBeforeVat: 10605.00,
     priceWithVat: 12195.75,
-    stock: 0,
+    stock: 4,
     minStock: 4,
   },
   {
@@ -119,7 +119,7 @@ export const initialProducts = [
     size: "2.7L",
     priceBeforeVat: 2121.00,
     priceWithVat: 2439.15,
-    stock: 0,
+    stock: 12,
     minStock: 5,
   },
   {
@@ -141,7 +141,7 @@ export const initialProducts = [
     size: "2.7L",
     priceBeforeVat: 2020.00,
     priceWithVat: 2323.00,
-    stock: 0,
+    stock: 7,
     minStock: 5,
   },
   {
@@ -174,7 +174,7 @@ export const initialProducts = [
     size: "15L",
     priceBeforeVat: 11009.00,
     priceWithVat: 12660.35,
-    stock: 0,
+    stock: 23,
     minStock: 5,
   },
   {
@@ -185,7 +185,7 @@ export const initialProducts = [
     size: "9L",
     priceBeforeVat: 14140.00,
     priceWithVat: 16261.00,
-    stock: 0,
+    stock: 9,
     minStock: 4,
   },
   {
@@ -207,7 +207,7 @@ export const initialProducts = [
     size: "9L",
     priceBeforeVat: 13231.00,
     priceWithVat: 15215.65,
-    stock: 0,
+    stock: 27,
     minStock: 3,
   },
   {
@@ -218,7 +218,7 @@ export const initialProducts = [
     size: "2.7L",
     priceBeforeVat: 4848.00,
     priceWithVat: 5575.20,
-    stock: 0,
+    stock: 1,
     minStock: 4,
   },
   {
@@ -229,7 +229,7 @@ export const initialProducts = [
     size: "9L",
     priceBeforeVat: 12625.00,
     priceWithVat: 14518.75,
-    stock: 0,
+    stock: 13,
     minStock: 3,
   },
   {
@@ -240,7 +240,7 @@ export const initialProducts = [
     size: "2.7L",
     priceBeforeVat: 4646.00,
     priceWithVat: 5342.90,
-    stock: 0,
+    stock: 7,
     minStock: 4,
   },
   {
@@ -262,7 +262,7 @@ export const initialProducts = [
     size: "10L",
     priceBeforeVat: 14847.00,
     priceWithVat: 17074.05,
-    stock: 0,
+    stock: 33,
     minStock: 3,
   },
 
@@ -275,7 +275,7 @@ export const initialProducts = [
     size: "15L",
     priceBeforeVat: 7676.00,
     priceWithVat: 8827.40,
-    stock: 0,
+    stock: 72,
     minStock: 5,
   },
   {
@@ -286,7 +286,7 @@ export const initialProducts = [
     size: "2.7L",
     priceBeforeVat: 3737.00,
     priceWithVat: 4297.55,
-    stock: 0,
+    stock: 8,
     minStock: 5,
   },
   {
@@ -308,7 +308,7 @@ export const initialProducts = [
     size: "2.7L",
     priceBeforeVat: 3535.00,
     priceWithVat: 4065.25,
-    stock: 0,
+    stock: 5,
     minStock: 4,
   },
   {
@@ -319,7 +319,7 @@ export const initialProducts = [
     size: "13.5L",
     priceBeforeVat: 15857.00,
     priceWithVat: 18235.55,
-    stock: 0,
+    stock: 9,
     minStock: 3,
   },
   {
@@ -363,7 +363,7 @@ export const initialProducts = [
     size: "15L",
     priceBeforeVat: 17675.00,
     priceWithVat: 20326.25,
-    stock: 0,
+    stock: 16,
     minStock: 4,
   },
   {
@@ -418,7 +418,7 @@ export const initialProducts = [
     size: "13.5L",
     priceBeforeVat: 15150.00,
     priceWithVat: 17422.50,
-    stock: 0,
+    stock: 40,
     minStock: 3,
   },
   {
@@ -440,7 +440,7 @@ export const initialProducts = [
     size: "13.5L",
     priceBeforeVat: 14342.00,
     priceWithVat: 16493.30,
-    stock: 0,
+    stock: 11,
     minStock: 3,
   },
   {
@@ -462,7 +462,7 @@ export const initialProducts = [
     size: "15L",
     priceBeforeVat: 16160.00,
     priceWithVat: 18584.00,
-    stock: 0,
+    stock: 120,
     minStock: 3,
   },
 
@@ -486,7 +486,7 @@ export const initialProducts = [
     size: "15L",
     priceBeforeVat: 4747.00,
     priceWithVat: 5459.05,
-    stock: 0,
+    stock: 61,
     minStock: 5,
   },
   {
@@ -497,7 +497,7 @@ export const initialProducts = [
     size: "15L",
     priceBeforeVat: 5858.00,
     priceWithVat: 6736.70,
-    stock: 0,
+    stock: 6,
     minStock: 10,
   },
   {
@@ -508,9 +508,20 @@ export const initialProducts = [
     size: "15L",
     priceBeforeVat: 9292.00,
     priceWithVat: 10685.80,
-    stock: 0,
+    stock: 17,
     minStock: 5,
-  }
+  },
+  {
+    id: "prod-47",
+    code: "ROLLER-9IN",
+    name: "PAINT ROLLER (9 INCH)",
+    category: "Accessories",
+    size: "1 pc",
+    priceBeforeVat: 500.00,
+    priceWithVat: 575.00,
+    stock: 13,
+    minStock: 5,
+  },
 ];
 
 // Clean slate: Zero transactions until real store operations begin
