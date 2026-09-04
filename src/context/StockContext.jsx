@@ -23,32 +23,32 @@ export function StockProvider({ children }) {
   const [cloudStatus, setCloudStatus] = useState('checking'); // 'connected' | 'offline' | 'checking'
 
   const [products, setProducts] = useState(() => {
-    const saved = localStorage.getItem('jotun_products_v5');
+    const saved = localStorage.getItem('jotun_products_v6');
     return saved ? JSON.parse(saved) : initialProducts;
   });
 
   const [sales, setSales] = useState(() => {
-    const saved = localStorage.getItem('jotun_sales_v5');
+    const saved = localStorage.getItem('jotun_sales_v6');
     return saved ? JSON.parse(saved) : initialSales;
   });
 
   const [movements, setMovements] = useState(() => {
-    const saved = localStorage.getItem('jotun_movements_v5');
+    const saved = localStorage.getItem('jotun_movements_v6');
     return saved ? JSON.parse(saved) : initialMovements;
   });
 
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
-    localStorage.setItem('jotun_products_v5', JSON.stringify(products));
+    localStorage.setItem('jotun_products_v6', JSON.stringify(products));
   }, [products]);
 
   useEffect(() => {
-    localStorage.setItem('jotun_sales_v5', JSON.stringify(sales));
+    localStorage.setItem('jotun_sales_v6', JSON.stringify(sales));
   }, [sales]);
 
   useEffect(() => {
-    localStorage.setItem('jotun_movements_v5', JSON.stringify(movements));
+    localStorage.setItem('jotun_movements_v6', JSON.stringify(movements));
   }, [movements]);
 
   // Fetch products, sales history, and audit movements from Supabase Cloud
@@ -101,10 +101,7 @@ export function StockProvider({ children }) {
             subtotal: parseFloat(item.subtotal)
           }))
         }));
-        // If cloud sales exist, adopt them
-        if (mappedSales.length > 0) {
-          setSales(mappedSales);
-        }
+        setSales(mappedSales);
       }
 
       if (movementsData && Array.isArray(movementsData)) {
@@ -120,9 +117,7 @@ export function StockProvider({ children }) {
           reference: m.reference || '',
           timestamp: m.created_at
         }));
-        if (mappedMovements.length > 0) {
-          setMovements(mappedMovements);
-        }
+        setMovements(mappedMovements);
       }
 
       setCloudStatus(hasCloudData ? 'connected' : 'offline');
@@ -351,6 +346,7 @@ export function StockProvider({ children }) {
   const syncOfficialCatalog = () => {
     // Reset local cache to official catalog defaults
     const keysToRemove = [
+      'jotun_products_v6', 'jotun_sales_v6', 'jotun_movements_v6',
       'jotun_products_v5', 'jotun_sales_v5', 'jotun_movements_v5',
       'jotun_products_v4', 'jotun_sales_v4', 'jotun_movements_v4',
       'jotun_products_v3', 'jotun_sales_v3', 'jotun_movements_v3',
