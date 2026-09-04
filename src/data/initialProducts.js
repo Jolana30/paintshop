@@ -466,23 +466,12 @@ export const initialProducts = [
     minStock: 3,
   },
 
-  // --- PRIMERS & PUTTY ---
-  {
-    id: "prod-43",
-    code: "1AR001DVA",
-    name: "PVA PRIMER",
-    category: "Primers & Putty",
-    size: "3L",
-    priceBeforeVat: 1313.00,
-    priceWithVat: 1509.95,
-    stock: 0,
-    minStock: 8,
-  },
+  // --- PRIMERS & UNDERCOATS ---
   {
     id: "prod-44",
     code: "1AR001RVA",
     name: "PVA PRIMER",
-    category: "Primers & Putty",
+    category: "Primers & Undercoats",
     size: "15L",
     priceBeforeVat: 4747.00,
     priceWithVat: 5459.05,
@@ -492,8 +481,8 @@ export const initialProducts = [
   {
     id: "prod-45",
     code: "1AJ001RVA",
-    name: "STUCCO PUTTY",
-    category: "Primers & Putty",
+    name: "STUCCO",
+    category: "Primers & Undercoats",
     size: "15L",
     priceBeforeVat: 5858.00,
     priceWithVat: 6736.70,
@@ -504,7 +493,7 @@ export const initialProducts = [
     id: "prod-46",
     code: "1AU001RVA",
     name: "TEXO COMPOUND WHITE",
-    category: "Primers & Putty",
+    category: "Primers & Undercoats",
     size: "15L",
     priceBeforeVat: 9292.00,
     priceWithVat: 10685.80,
