@@ -470,7 +470,7 @@ export const initialProducts = [
   {
     id: "prod-43",
     code: "1AR001DVA",
-    name: "PVA PRIMER WHITE",
+    name: "PVA PRIMER",
     category: "Primers & Putty",
     size: "3L",
     priceBeforeVat: 1313.00,
@@ -481,7 +481,7 @@ export const initialProducts = [
   {
     id: "prod-44",
     code: "1AR001RVA",
-    name: "PVA PRIMER WHITE",
+    name: "PVA PRIMER",
     category: "Primers & Putty",
     size: "15L",
     priceBeforeVat: 4747.00,

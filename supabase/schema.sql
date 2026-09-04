@@ -111,8 +111,8 @@ INSERT INTO products (id, code, name, category, size, price_before_vat, price_wi
 ('prod-40', '1E6MCNPQA', 'JOTASHIELD TEX MEDIUM BASE C', 'Exterior', '13.5L', 14342.00, 16493.30, 6, 3),
 ('prod-41', '1E6001DVA', 'JOTASHIELD TEX MEDIUM WHITE', 'Exterior', '3L', 4343.00, 4994.45, 16, 5),
 ('prod-42', '1E6001RVA', 'JOTASHIELD TEX MEDIUM WHITE', 'Exterior', '15L', 16160.00, 18584.00, 10, 3),
-('prod-43', '1AR001DVA', 'PVA PRIMER WHITE', 'Primers & Putty', '3L', 1313.00, 1509.95, 4, 8),
-('prod-44', '1AR001RVA', 'PVA PRIMER WHITE', 'Primers & Putty', '15L', 4747.00, 5459.05, 18, 5),
+('prod-43', '1AR001DVA', 'PVA PRIMER', 'Primers & Putty', '3L', 1313.00, 1509.95, 4, 8),
+('prod-44', '1AR001RVA', 'PVA PRIMER', 'Primers & Putty', '15L', 4747.00, 5459.05, 18, 5),
 ('prod-45', '1AJ001RVA', 'STUCCO PUTTY', 'Primers & Putty', '15L', 5858.00, 6736.70, 35, 10),
 ('prod-46', '1AU001RVA', 'TEXO COMPOUND WHITE', 'Primers & Putty', '15L', 9292.00, 10685.80, 15, 5)
 ON CONFLICT (id) DO UPDATE SET 
