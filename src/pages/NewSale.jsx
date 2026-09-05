@@ -61,11 +61,17 @@ export default function NewSale({ setActiveTab }) {
         return prevCart.map(item => {
           if (item.productId === product.id) {
             const nextQty = item.quantity + 1;
-            const subtotal = (nextQty * item.unitPrice) + (item.colorantCost || 0);
+            const unitColorant = item.unitColorantCost || 0;
+            const totalColorant = unitColorant * nextQty;
+            const totalBeforeVat = (item.priceBeforeVat * nextQty) + totalColorant;
+            const machineTotal = totalColorant > 0
+              ? Math.floor((totalBeforeVat * 1.15) * 100) / 100
+              : nextQty * item.unitPrice;
             return {
               ...item,
               quantity: nextQty,
-              subtotal
+              colorantCost: totalColorant,
+              subtotal: machineTotal
             };
           }
           return item;
@@ -84,6 +90,7 @@ export default function NewSale({ setActiveTab }) {
             quantity: 1,
             maxStock: product.stock,
             isTintable: canTint,
+            unitColorantCost: 0,
             colorantCost: 0,
             subtotal: product.priceWithVat
           }
@@ -101,15 +108,24 @@ export default function NewSale({ setActiveTab }) {
         return prevCart.filter(item => item.productId !== productId);
       }
 
-      return prevCart.map(item =>
-        item.productId === productId
-          ? {
-              ...item,
-              quantity: item.quantity - 1,
-              subtotal: ((item.quantity - 1) * item.unitPrice) + (item.colorantCost || 0)
-            }
-          : item
-      );
+      return prevCart.map(item => {
+        if (item.productId === productId) {
+          const nextQty = item.quantity - 1;
+          const unitColorant = item.unitColorantCost || 0;
+          const totalColorant = unitColorant * nextQty;
+          const totalBeforeVat = (item.priceBeforeVat * nextQty) + totalColorant;
+          const machineTotal = totalColorant > 0
+            ? Math.floor((totalBeforeVat * 1.15) * 100) / 100
+            : nextQty * item.unitPrice;
+          return {
+            ...item,
+            quantity: nextQty,
+            colorantCost: totalColorant,
+            subtotal: machineTotal
+          };
+        }
+        return item;
+      });
     });
   };
 
@@ -127,15 +143,23 @@ export default function NewSale({ setActiveTab }) {
     }
 
     setCart(prevCart =>
-      prevCart.map(item =>
-        item.productId === productId
-          ? {
-              ...item,
-              quantity: qty,
-              subtotal: (qty * item.unitPrice) + (item.colorantCost || 0)
-            }
-          : item
-      )
+      prevCart.map(item => {
+        if (item.productId === productId) {
+          const unitColorant = item.unitColorantCost || 0;
+          const totalColorant = unitColorant * qty;
+          const totalBeforeVat = (item.priceBeforeVat * qty) + totalColorant;
+          const machineTotal = totalColorant > 0
+            ? Math.floor((totalBeforeVat * 1.15) * 100) / 100
+            : qty * item.unitPrice;
+          return {
+            ...item,
+            quantity: qty,
+            colorantCost: totalColorant,
+            subtotal: machineTotal
+          };
+        }
+        return item;
+      })
     );
   };
 
@@ -147,18 +171,17 @@ export default function NewSale({ setActiveTab }) {
     setCart(prevCart =>
       prevCart.map(item => {
         if (item.productId === productId) {
-          // In Jotun Colour Manager: Base 13,231.00 + Colorant 2,787.78 = 16,018.78 + 15% VAT = 18,421.59 ETB!
-          // Machine truncates/rounds 18,421.597 down to 18,421.59.
-          const baseWithVat = item.quantity * item.unitPrice;
-          const totalBeforeVat = (item.priceBeforeVat * item.quantity) + validCost;
-          const machineTotal = validCost > 0 
+          // validCost is the per-can colorant cost shown on Jotun machine
+          const totalColorant = validCost * item.quantity;
+          const totalBeforeVat = (item.priceBeforeVat * item.quantity) + totalColorant;
+          const machineTotal = totalColorant > 0 
             ? Math.floor((totalBeforeVat * 1.15) * 100) / 100 
-            : baseWithVat;
-          const colorantWithVat = machineTotal - baseWithVat;
+            : item.quantity * item.unitPrice;
           return {
             ...item,
-            colorantCost: validCost,
-            colorantWithVat,
+            unitColorantCost: validCost,
+            colorantCost: totalColorant,
+            colorantWithVat: machineTotal - (item.quantity * item.unitPrice),
             subtotal: machineTotal
           };
         }
@@ -456,6 +479,11 @@ export default function NewSale({ setActiveTab }) {
                       <div className="colorant-input-row">
                         <div className="colorant-input-label">
                           <span>Colorant Cost:</span>
+                          {item.quantity > 1 && item.unitColorantCost > 0 && (
+                            <span className="text-xs text-muted" style={{ fontWeight: 600 }}>
+                              ({formatCurrency(item.unitColorantCost)} × {item.quantity} cans = {formatCurrency(item.colorantCost)})
+                            </span>
+                          )}
                         </div>
                         <div className="colorant-input-wrapper">
                           <span className="currency-prefix">ETB</span>
@@ -464,12 +492,12 @@ export default function NewSale({ setActiveTab }) {
                             step="0.01"
                             min="0"
                             placeholder="0.00"
-                            value={item.colorantCost || ''}
+                            value={item.unitColorantCost || ''}
                             onChange={(e) => updateColorantCost(item.productId, e.target.value)}
                             className="colorant-number-input"
-                            title="Enter colorant cost"
+                            title="Enter colorant cost per can"
                           />
-                          {item.colorantCost > 0 && (
+                          {item.unitColorantCost > 0 && (
                             <button
                               type="button"
                               className="clear-colorant-btn"
