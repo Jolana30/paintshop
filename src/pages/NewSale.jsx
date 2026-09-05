@@ -147,18 +147,19 @@ export default function NewSale({ setActiveTab }) {
     setCart(prevCart =>
       prevCart.map(item => {
         if (item.productId === productId) {
-          // Calculate subtotal with VAT included for colorant if entered
-          // (Machine gives colorant cost: e.g. 2,787.78 ETB)
-          // Total for item = (quantity * unitPrice) + (validCost * 1.15 if before VAT, or validCost directly if total)
           // In Jotun Colour Manager: Base 13,231.00 + Colorant 2,787.78 = 16,018.78 + 15% VAT = 18,421.59 ETB!
-          // So colorant cost on screen (2,787.78) is BEFORE VAT, exactly like Base cost (13,231.00) is before VAT.
-          const colorantWithVat = validCost * 1.15;
-          const subtotal = (item.quantity * item.unitPrice) + colorantWithVat;
+          // Machine truncates/rounds 18,421.597 down to 18,421.59.
+          const baseWithVat = item.quantity * item.unitPrice;
+          const totalBeforeVat = (item.priceBeforeVat * item.quantity) + validCost;
+          const machineTotal = validCost > 0 
+            ? Math.floor((totalBeforeVat * 1.15) * 100) / 100 
+            : baseWithVat;
+          const colorantWithVat = machineTotal - baseWithVat;
           return {
             ...item,
             colorantCost: validCost,
             colorantWithVat,
-            subtotal
+            subtotal: machineTotal
           };
         }
         return item;
