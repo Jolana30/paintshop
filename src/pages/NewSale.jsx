@@ -451,12 +451,11 @@ export default function NewSale({ setActiveTab }) {
                       </div>
                     </div>
 
-                    {/* ONLY FOR TINTABLE BASES: Optional Machine Colorant Cost Input */}
+                    {/* ONLY FOR TINTABLE BASES: Optional Colorant Cost Input */}
                     {item.isTintable && (
                       <div className="colorant-input-row">
                         <div className="colorant-input-label">
-                          <span>🎨 Machine Colorant Cost:</span>
-                          <span className="text-xs text-muted">(From Jotun laptop)</span>
+                          <span>Colorant Cost:</span>
                         </div>
                         <div className="colorant-input-wrapper">
                           <span className="currency-prefix">ETB</span>
@@ -468,7 +467,7 @@ export default function NewSale({ setActiveTab }) {
                             value={item.colorantCost || ''}
                             onChange={(e) => updateColorantCost(item.productId, e.target.value)}
                             className="colorant-number-input"
-                            title="Enter the colorant cost shown on Jotun Colour Manager screen"
+                            title="Enter colorant cost"
                           />
                           {item.colorantCost > 0 && (
                             <button
@@ -517,7 +516,7 @@ export default function NewSale({ setActiveTab }) {
                   </div>
                   {cartColorantBeforeVat > 0 && (
                     <div className="financial-row text-primary">
-                      <span>🎨 Tinting Colorant (Subtotal)</span>
+                      <span>Colorant (Subtotal)</span>
                       <span>+{formatCurrency(cartColorantBeforeVat)}</span>
                     </div>
                   )}
