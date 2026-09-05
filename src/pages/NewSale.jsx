@@ -17,6 +17,7 @@ export default function NewSale({ setActiveTab }) {
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [cart, setCart] = useState([]);
   const [paymentType, setPaymentType] = useState('Cash'); // 'Cash', 'CBE', 'Sinke', 'Coop', 'Awash', 'Dashen'
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
   // Extract unique categories
   const categories = useMemo(() => {
@@ -61,16 +62,14 @@ export default function NewSale({ setActiveTab }) {
         return prevCart.map(item => {
           if (item.productId === product.id) {
             const nextQty = item.quantity + 1;
-            const unitColorant = item.unitColorantCost || 0;
-            const totalColorant = unitColorant * nextQty;
-            const totalBeforeVat = (item.priceBeforeVat * nextQty) + totalColorant;
-            const machineTotal = totalColorant > 0
+            const currentTotalColorant = item.colorantCost || 0;
+            const totalBeforeVat = (item.priceBeforeVat * nextQty) + currentTotalColorant;
+            const machineTotal = currentTotalColorant > 0
               ? Math.floor((totalBeforeVat * 1.15) * 100) / 100
               : nextQty * item.unitPrice;
             return {
               ...item,
               quantity: nextQty,
-              colorantCost: totalColorant,
               subtotal: machineTotal
             };
           }
@@ -90,7 +89,6 @@ export default function NewSale({ setActiveTab }) {
             quantity: 1,
             maxStock: product.stock,
             isTintable: canTint,
-            unitColorantCost: 0,
             colorantCost: 0,
             subtotal: product.priceWithVat
           }
@@ -111,16 +109,14 @@ export default function NewSale({ setActiveTab }) {
       return prevCart.map(item => {
         if (item.productId === productId) {
           const nextQty = item.quantity - 1;
-          const unitColorant = item.unitColorantCost || 0;
-          const totalColorant = unitColorant * nextQty;
-          const totalBeforeVat = (item.priceBeforeVat * nextQty) + totalColorant;
-          const machineTotal = totalColorant > 0
+          const currentTotalColorant = item.colorantCost || 0;
+          const totalBeforeVat = (item.priceBeforeVat * nextQty) + currentTotalColorant;
+          const machineTotal = currentTotalColorant > 0
             ? Math.floor((totalBeforeVat * 1.15) * 100) / 100
             : nextQty * item.unitPrice;
           return {
             ...item,
             quantity: nextQty,
-            colorantCost: totalColorant,
             subtotal: machineTotal
           };
         }
@@ -145,16 +141,14 @@ export default function NewSale({ setActiveTab }) {
     setCart(prevCart =>
       prevCart.map(item => {
         if (item.productId === productId) {
-          const unitColorant = item.unitColorantCost || 0;
-          const totalColorant = unitColorant * qty;
-          const totalBeforeVat = (item.priceBeforeVat * qty) + totalColorant;
-          const machineTotal = totalColorant > 0
+          const currentTotalColorant = item.colorantCost || 0;
+          const totalBeforeVat = (item.priceBeforeVat * qty) + currentTotalColorant;
+          const machineTotal = currentTotalColorant > 0
             ? Math.floor((totalBeforeVat * 1.15) * 100) / 100
             : qty * item.unitPrice;
           return {
             ...item,
             quantity: qty,
-            colorantCost: totalColorant,
             subtotal: machineTotal
           };
         }
@@ -163,7 +157,8 @@ export default function NewSale({ setActiveTab }) {
     );
   };
 
-  // Update colorant cost for tintable base cans (from Jotun machine)
+  // Update colorant cost for tintable base cans directly from Jotun machine
+  // In Jotun Colour Manager, if user selected 3 cans, machine already outputs the total colorant cost!
   const updateColorantCost = (productId, costInput) => {
     const cost = parseFloat(costInput);
     const validCost = isNaN(cost) || cost < 0 ? 0 : cost;
@@ -171,16 +166,13 @@ export default function NewSale({ setActiveTab }) {
     setCart(prevCart =>
       prevCart.map(item => {
         if (item.productId === productId) {
-          // validCost is the per-can colorant cost shown on Jotun machine
-          const totalColorant = validCost * item.quantity;
-          const totalBeforeVat = (item.priceBeforeVat * item.quantity) + totalColorant;
-          const machineTotal = totalColorant > 0 
+          const totalBeforeVat = (item.priceBeforeVat * item.quantity) + validCost;
+          const machineTotal = validCost > 0 
             ? Math.floor((totalBeforeVat * 1.15) * 100) / 100 
             : item.quantity * item.unitPrice;
           return {
             ...item,
-            unitColorantCost: validCost,
-            colorantCost: totalColorant,
+            colorantCost: validCost,
             colorantWithVat: machineTotal - (item.quantity * item.unitPrice),
             subtotal: machineTotal
           };
@@ -220,6 +212,7 @@ export default function NewSale({ setActiveTab }) {
     if (completed) {
       setCart([]);
       setPaymentType('Cash');
+      setIsMobileCartOpen(false);
       // Navigate directly to Sales History so user immediately sees their recorded transaction
       setActiveTab('sales');
     }
@@ -233,6 +226,17 @@ export default function NewSale({ setActiveTab }) {
           <p className="page-subtitle">Select paints, set quantity, and record sale directly into Sales History</p>
         </div>
         <div className="header-actions-group">
+          {cart.length > 0 && (
+            <button
+              type="button"
+              className="btn-header-cart-badge"
+              onClick={() => setIsMobileCartOpen(true)}
+              title="Open current order"
+            >
+              <ShoppingCartIcon size={15} />
+              <span>Cart ({cartItemCount}) • {formatCurrency(cartTotal)}</span>
+            </button>
+          )}
           <button
             type="button"
             className="btn-outline-sm"
@@ -384,7 +388,7 @@ export default function NewSale({ setActiveTab }) {
           </div>
         </div>
 
-        {/* Right Side: Current Sale Order & Checkout */}
+        {/* Right Side: Current Sale Order & Checkout (Desktop Sticky Sidebar) */}
         <div className="sale-cart-sidebar">
           <div className="cart-card">
             <div className="cart-header">
@@ -418,14 +422,7 @@ export default function NewSale({ setActiveTab }) {
                   <div key={item.productId} className={`cart-item-card ${item.isTintable ? 'tintable-item-card' : ''}`}>
                     <div className="cart-item-row">
                       <div className="cart-item-info">
-                        <div className="cart-item-header-row">
-                          <span className="cart-item-name">{item.productName}</span>
-                          {item.isTintable && (
-                            <span className="badge-tag-tintable" title="Tintable Base">
-                              Base
-                            </span>
-                          )}
-                        </div>
+                        <span className="cart-item-name">{item.productName}</span>
                         <div className="cart-item-sub">
                           <span className="cart-item-size-badge">{item.size}</span>
                           <span className="cart-item-base-price">Base: {formatCurrency(item.unitPrice)}</span>
@@ -479,11 +476,6 @@ export default function NewSale({ setActiveTab }) {
                       <div className="colorant-input-row">
                         <div className="colorant-input-label">
                           <span>Colorant Cost:</span>
-                          {item.quantity > 1 && item.unitColorantCost > 0 && (
-                            <span className="text-xs text-muted" style={{ fontWeight: 600 }}>
-                              ({formatCurrency(item.unitColorantCost)} × {item.quantity} cans = {formatCurrency(item.colorantCost)})
-                            </span>
-                          )}
                         </div>
                         <div className="colorant-input-wrapper">
                           <span className="currency-prefix">ETB</span>
@@ -492,12 +484,12 @@ export default function NewSale({ setActiveTab }) {
                             step="0.01"
                             min="0"
                             placeholder="0.00"
-                            value={item.unitColorantCost || ''}
+                            value={item.colorantCost || ''}
                             onChange={(e) => updateColorantCost(item.productId, e.target.value)}
                             className="colorant-number-input"
-                            title="Enter colorant cost per can"
+                            title="Enter colorant cost from machine"
                           />
-                          {item.unitColorantCost > 0 && (
+                          {item.colorantCost > 0 && (
                             <button
                               type="button"
                               className="clear-colorant-btn"
@@ -574,22 +566,196 @@ export default function NewSale({ setActiveTab }) {
         </div>
       </div>
 
-      {/* Universal Floating Proceed Bar (Visible on all devices when items selected) */}
+      {/* Universal Floating Proceed Bar */}
       {cart.length > 0 && (
         <div className="universal-proceed-bar">
-          <div className="proceed-bar-left">
-            <span className="proceed-bar-badge">🛒 {cartItemCount} item(s) selected</span>
-            <span className="proceed-bar-total">Total Due: <strong>{formatCurrency(cartTotal)}</strong></span>
+          <div className="proceed-bar-left" onClick={() => setIsMobileCartOpen(true)} title="Click to view & edit cart">
+            <span className="proceed-bar-badge">🛒 {cartItemCount} item{cartItemCount > 1 ? 's' : ''}</span>
+            <span className="proceed-bar-total">Total: <strong>{formatCurrency(cartTotal)}</strong></span>
           </div>
-          <button
-            type="button"
-            className="btn-universal-proceed"
-            onClick={handleRecordSale}
-            title="Click to complete this sale and save to Sales History"
-          >
-            <CheckCircleIcon size={20} />
-            <span>PROCEED & RECORD SALE ({formatCurrency(cartTotal)}) ➔</span>
-          </button>
+          <div className="proceed-bar-actions">
+            <button
+              type="button"
+              className="btn-mobile-review-cart"
+              onClick={() => setIsMobileCartOpen(true)}
+              title="Review items and colorant"
+            >
+              Review Cart ➔
+            </button>
+            <button
+              type="button"
+              className="btn-universal-proceed"
+              onClick={handleRecordSale}
+              title="Click to complete this sale and save to Sales History"
+            >
+              <CheckCircleIcon size={18} />
+              <span>RECORD SALE</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Native Mobile Cart Bottom Sheet Modal */}
+      {isMobileCartOpen && (
+        <div className="mobile-cart-backdrop" onClick={() => setIsMobileCartOpen(false)}>
+          <div className="mobile-cart-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-cart-sheet-header">
+              <div className="flex-items-center gap-2">
+                <ShoppingCartIcon size={20} className="text-primary" />
+                <span className="sheet-title">Current Sale Order ({cartItemCount} items)</span>
+              </div>
+              <button
+                type="button"
+                className="btn-close-sheet"
+                onClick={() => setIsMobileCartOpen(false)}
+                title="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mobile-cart-sheet-body">
+              {/* Items in Mobile Drawer */}
+              <div className="cart-items-list">
+                {cart.map(item => (
+                  <div key={item.productId} className={`cart-item-card ${item.isTintable ? 'tintable-item-card' : ''}`}>
+                    <div className="cart-item-row">
+                      <div className="cart-item-info">
+                        <span className="cart-item-name">{item.productName}</span>
+                        <div className="cart-item-sub">
+                          <span className="cart-item-size-badge">{item.size}</span>
+                          <span className="cart-item-base-price">Base: {formatCurrency(item.unitPrice)}</span>
+                        </div>
+                      </div>
+
+                      <div className="cart-item-qty-controls">
+                        <button
+                          type="button"
+                          className="qty-btn"
+                          onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                          title="Decrease"
+                        >
+                          <MinusIcon size={14} />
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          max={item.maxStock}
+                          value={item.quantity}
+                          onChange={(e) => updateQuantity(item.productId, e.target.value)}
+                          className="qty-input"
+                        />
+                        <button
+                          type="button"
+                          className="qty-btn"
+                          onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                          title="Increase"
+                          disabled={item.quantity >= item.maxStock}
+                        >
+                          <PlusIcon size={14} />
+                        </button>
+                      </div>
+
+                      <div className="cart-item-price-block">
+                        <span className="cart-item-subtotal">{formatCurrency(item.subtotal)}</span>
+                        <button
+                          type="button"
+                          className="btn-icon-trash"
+                          onClick={() => removeFromCart(item.productId)}
+                          title="Remove"
+                        >
+                          <TrashIcon size={15} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* ONLY FOR TINTABLE BASES: Optional Colorant Cost Input */}
+                    {item.isTintable && (
+                      <div className="colorant-input-row">
+                        <div className="colorant-input-label">
+                          <span>Colorant Cost:</span>
+                        </div>
+                        <div className="colorant-input-wrapper">
+                          <span className="currency-prefix">ETB</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={item.colorantCost || ''}
+                            onChange={(e) => updateColorantCost(item.productId, e.target.value)}
+                            className="colorant-number-input"
+                            title="Enter colorant cost from machine"
+                          />
+                          {item.colorantCost > 0 && (
+                            <button
+                              type="button"
+                              className="clear-colorant-btn"
+                              onClick={() => updateColorantCost(item.productId, 0)}
+                              title="Clear colorant"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Payment Type Grid in Mobile Drawer */}
+              <div className="form-group mb-3 mt-3">
+                <label className="form-label" style={{ fontWeight: 700, marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Payment Type:</span>
+                  <span className="badge-pill badge-primary" style={{ fontSize: '11px' }}>{paymentType}</span>
+                </label>
+                <div className="payment-type-grid">
+                  {['Cash', 'CBE', 'Telebirr', 'Sinke', 'Coop', 'Awash', 'Dashen'].map(type => (
+                    <button
+                      key={type}
+                      type="button"
+                      className={`payment-type-btn ${paymentType === type ? 'active' : ''}`}
+                      onClick={() => setPaymentType(type)}
+                    >
+                      {type === 'Cash' ? '💵 Cash' : type === 'Telebirr' ? '📱 Telebirr' : `🏦 ${type}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Financials Breakdown in Mobile Drawer */}
+              <div className="cart-financials">
+                <div className="financial-row">
+                  <span>Base Paint ({cartItemCount} items)</span>
+                  <span>{formatCurrency(cartBaseBeforeVat)}</span>
+                </div>
+                {cartColorantBeforeVat > 0 && (
+                  <div className="financial-row text-primary">
+                    <span>Colorant (Subtotal)</span>
+                    <span>+{formatCurrency(cartColorantBeforeVat)}</span>
+                  </div>
+                )}
+                <div className="financial-row">
+                  <span>VAT (15%)</span>
+                  <span>{formatCurrency(cartVatTotal)}</span>
+                </div>
+                <div className="financial-row financial-total">
+                  <span>Total Due (ETB)</span>
+                  <span>{formatCurrency(cartTotal)}</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="btn-complete-sale"
+                onClick={handleRecordSale}
+              >
+                <CheckCircleIcon size={20} />
+                Confirm Sale ({formatCurrency(cartTotal)})
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
