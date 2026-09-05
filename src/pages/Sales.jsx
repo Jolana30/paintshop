@@ -605,6 +605,11 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
                     <div>
                       <span className="font-semibold text-xs">{item.productName}</span>
                       <div className="text-xs text-muted">{item.size} • {item.code}</div>
+                      {item.colorantCost > 0 && (
+                        <div className="text-xs text-primary" style={{ fontWeight: 600 }}>
+                          🎨 Colorant: +{formatCurrency(item.colorantCost * 1.15)} (inc VAT)
+                        </div>
+                      )}
                     </div>
                     <div className="text-center text-xs">{item.quantity}</div>
                     <div className="text-right text-xs">{formatCurrency(item.unitPrice)}</div>

@@ -33,6 +33,20 @@ export default function NewSale({ setActiveTab }) {
     });
   }, [products, selectedCategory, searchTerm]);
 
+  // Helper: check if a paint is a tintable base (e.g. BS A, BS B, BS C, BASE A, BASE B, BASE C)
+  // Non-base paints (like White, Matt White, Silk White, Primers, Putty) CANNOT have colorant added!
+  const isTintableBase = (productName = '') => {
+    const upper = productName.toUpperCase();
+    return (
+      upper.includes('BS A') ||
+      upper.includes('BS B') ||
+      upper.includes('BS C') ||
+      upper.includes('BASE A') ||
+      upper.includes('BASE B') ||
+      upper.includes('BASE C')
+    );
+  };
+
   // Add or increment product in sale
   const handleAddProduct = (product) => {
     if (product.stock <= 0) return;
@@ -44,16 +58,20 @@ export default function NewSale({ setActiveTab }) {
           alert(`Cannot add more than available stock (${product.stock} units)`);
           return prevCart;
         }
-        return prevCart.map(item =>
-          item.productId === product.id
-            ? {
-                ...item,
-                quantity: item.quantity + 1,
-                subtotal: (item.quantity + 1) * item.unitPrice
-              }
-            : item
-        );
+        return prevCart.map(item => {
+          if (item.productId === product.id) {
+            const nextQty = item.quantity + 1;
+            const subtotal = (nextQty * item.unitPrice) + (item.colorantCost || 0);
+            return {
+              ...item,
+              quantity: nextQty,
+              subtotal
+            };
+          }
+          return item;
+        });
       } else {
+        const canTint = isTintableBase(product.name);
         return [
           ...prevCart,
           {
@@ -65,6 +83,8 @@ export default function NewSale({ setActiveTab }) {
             priceBeforeVat: product.priceBeforeVat,
             quantity: 1,
             maxStock: product.stock,
+            isTintable: canTint,
+            colorantCost: 0,
             subtotal: product.priceWithVat
           }
         ];
@@ -86,7 +106,7 @@ export default function NewSale({ setActiveTab }) {
           ? {
               ...item,
               quantity: item.quantity - 1,
-              subtotal: (item.quantity - 1) * item.unitPrice
+              subtotal: ((item.quantity - 1) * item.unitPrice) + (item.colorantCost || 0)
             }
           : item
       );
@@ -112,10 +132,37 @@ export default function NewSale({ setActiveTab }) {
           ? {
               ...item,
               quantity: qty,
-              subtotal: qty * item.unitPrice
+              subtotal: (qty * item.unitPrice) + (item.colorantCost || 0)
             }
           : item
       )
+    );
+  };
+
+  // Update colorant cost for tintable base cans (from Jotun machine)
+  const updateColorantCost = (productId, costInput) => {
+    const cost = parseFloat(costInput);
+    const validCost = isNaN(cost) || cost < 0 ? 0 : cost;
+
+    setCart(prevCart =>
+      prevCart.map(item => {
+        if (item.productId === productId) {
+          // Calculate subtotal with VAT included for colorant if entered
+          // (Machine gives colorant cost: e.g. 2,787.78 ETB)
+          // Total for item = (quantity * unitPrice) + (validCost * 1.15 if before VAT, or validCost directly if total)
+          // In Jotun Colour Manager: Base 13,231.00 + Colorant 2,787.78 = 16,018.78 + 15% VAT = 18,421.59 ETB!
+          // So colorant cost on screen (2,787.78) is BEFORE VAT, exactly like Base cost (13,231.00) is before VAT.
+          const colorantWithVat = validCost * 1.15;
+          const subtotal = (item.quantity * item.unitPrice) + colorantWithVat;
+          return {
+            ...item,
+            colorantCost: validCost,
+            colorantWithVat,
+            subtotal
+          };
+        }
+        return item;
+      })
     );
   };
 
@@ -132,7 +179,9 @@ export default function NewSale({ setActiveTab }) {
   // Financial calculations
   const cartTotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const cartSubtotalBeforeVat = cart.reduce((sum, item) => sum + (item.priceBeforeVat * item.quantity), 0);
+  const cartBaseBeforeVat = cart.reduce((sum, item) => sum + (item.priceBeforeVat * item.quantity), 0);
+  const cartColorantBeforeVat = cart.reduce((sum, item) => sum + (item.colorantCost || 0), 0);
+  const cartSubtotalBeforeVat = cartBaseBeforeVat + cartColorantBeforeVat;
   const cartVatTotal = cartTotal - cartSubtotalBeforeVat;
 
   // Record Sale and immediately show it in Sales History
@@ -342,56 +391,98 @@ export default function NewSale({ setActiveTab }) {
                 </div>
               ) : (
                 cart.map(item => (
-                  <div key={item.productId} className="cart-item-row">
-                    <div className="cart-item-info">
-                      <span className="cart-item-name">{item.productName}</span>
-                      <div className="cart-item-sub">
-                        <span className="cart-item-size">{item.size}</span>
-                        <span>•</span>
-                        <span>{formatCurrency(item.unitPrice)}</span>
+                  <div key={item.productId} className={`cart-item-card ${item.isTintable ? 'tintable-item-card' : ''}`}>
+                    <div className="cart-item-row">
+                      <div className="cart-item-info">
+                        <div className="flex items-center gap-1">
+                          <span className="cart-item-name">{item.productName}</span>
+                          {item.isTintable && (
+                            <span className="badge-tag-tintable" title="Tintable Base - Colorant can be added from Jotun machine">
+                              TINTABLE BASE
+                            </span>
+                          )}
+                        </div>
+                        <div className="cart-item-sub">
+                          <span className="cart-item-size">{item.size}</span>
+                          <span>•</span>
+                          <span>Base: {formatCurrency(item.unitPrice)}</span>
+                        </div>
+                      </div>
+
+                      {/* Quantity controls */}
+                      <div className="cart-item-qty-controls">
+                        <button
+                          type="button"
+                          className="qty-btn"
+                          onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                          title="Decrease"
+                        >
+                          <MinusIcon size={14} />
+                        </button>
+                        <input
+                          type="number"
+                          min="1"
+                          max={item.maxStock}
+                          value={item.quantity}
+                          onChange={(e) => updateQuantity(item.productId, e.target.value)}
+                          className="qty-input"
+                        />
+                        <button
+                          type="button"
+                          className="qty-btn"
+                          onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                          title="Increase"
+                          disabled={item.quantity >= item.maxStock}
+                        >
+                          <PlusIcon size={14} />
+                        </button>
+                      </div>
+
+                      <div className="cart-item-price-block">
+                        <span className="cart-item-subtotal">{formatCurrency(item.subtotal)}</span>
+                        <button
+                          type="button"
+                          className="btn-icon-trash"
+                          onClick={() => removeFromCart(item.productId)}
+                          title="Remove"
+                        >
+                          <TrashIcon size={15} />
+                        </button>
                       </div>
                     </div>
 
-                    {/* Quantity controls */}
-                    <div className="cart-item-qty-controls">
-                      <button
-                        type="button"
-                        className="qty-btn"
-                        onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                        title="Decrease"
-                      >
-                        <MinusIcon size={14} />
-                      </button>
-                      <input
-                        type="number"
-                        min="1"
-                        max={item.maxStock}
-                        value={item.quantity}
-                        onChange={(e) => updateQuantity(item.productId, e.target.value)}
-                        className="qty-input"
-                      />
-                      <button
-                        type="button"
-                        className="qty-btn"
-                        onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                        title="Increase"
-                        disabled={item.quantity >= item.maxStock}
-                      >
-                        <PlusIcon size={14} />
-                      </button>
-                    </div>
-
-                    <div className="cart-item-price-block">
-                      <span className="cart-item-subtotal">{formatCurrency(item.subtotal)}</span>
-                      <button
-                        type="button"
-                        className="btn-icon-trash"
-                        onClick={() => removeFromCart(item.productId)}
-                        title="Remove"
-                      >
-                        <TrashIcon size={15} />
-                      </button>
-                    </div>
+                    {/* ONLY FOR TINTABLE BASES: Optional Machine Colorant Cost Input */}
+                    {item.isTintable && (
+                      <div className="colorant-input-row">
+                        <div className="colorant-input-label">
+                          <span>🎨 Machine Colorant Cost:</span>
+                          <span className="text-xs text-muted">(From Jotun laptop)</span>
+                        </div>
+                        <div className="colorant-input-wrapper">
+                          <span className="currency-prefix">ETB</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={item.colorantCost || ''}
+                            onChange={(e) => updateColorantCost(item.productId, e.target.value)}
+                            className="colorant-number-input"
+                            title="Enter the colorant cost shown on Jotun Colour Manager screen"
+                          />
+                          {item.colorantCost > 0 && (
+                            <button
+                              type="button"
+                              className="clear-colorant-btn"
+                              onClick={() => updateColorantCost(item.productId, 0)}
+                              title="Clear colorant"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -421,9 +512,15 @@ export default function NewSale({ setActiveTab }) {
 
                 <div className="cart-financials">
                   <div className="financial-row">
-                    <span>Subtotal ({cartItemCount} items)</span>
-                    <span>{formatCurrency(cartSubtotalBeforeVat)}</span>
+                    <span>Base Paint ({cartItemCount} items)</span>
+                    <span>{formatCurrency(cartBaseBeforeVat)}</span>
                   </div>
+                  {cartColorantBeforeVat > 0 && (
+                    <div className="financial-row text-primary">
+                      <span>🎨 Tinting Colorant (Subtotal)</span>
+                      <span>+{formatCurrency(cartColorantBeforeVat)}</span>
+                    </div>
+                  )}
                   <div className="financial-row">
                     <span>VAT (15%)</span>
                     <span>{formatCurrency(cartVatTotal)}</span>
