@@ -11,15 +11,7 @@ import { printOrSaveAsPdf } from '../utils/exportPdf';
 export default function Sales({ setActiveTab, initialDate = '', onClearDateFilter }) {
   const { sales, formatCurrency } = useStock();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDate, setSelectedDate] = useState(initialDate); // '' means all dates, or 'YYYY-MM-DD'
   const [selectedSale, setSelectedSale] = useState(null);
-
-  // Sync initialDate when navigating from dashboard
-  useEffect(() => {
-    if (initialDate !== undefined) {
-      setSelectedDate(initialDate);
-    }
-  }, [initialDate]);
 
   // Quick date presets
   const todayStr = useMemo(() => {
@@ -38,38 +30,95 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
     return `${year}-${month}-${day}`;
   }, []);
 
+  const currentMonthStr = useMemo(() => {
+    return todayStr.substring(0, 7); // "YYYY-MM"
+  }, [todayStr]);
+
+  const lastMonthStr = useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  }, []);
+
+  // Filter states (Default is Today!)
+  const [filterMode, setFilterMode] = useState('DAY'); // 'DAY' | 'MONTH' | 'ALL'
+  const [selectedDate, setSelectedDate] = useState(() => initialDate || todayStr);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
+  const [selectedPayment, setSelectedPayment] = useState('ALL'); // 'ALL', 'Cash', 'CBE', 'Telebirr', 'Sinke', 'Coop', 'Awash', 'Dashen'
+
+  // Sync initialDate when navigating from dashboard
+  useEffect(() => {
+    if (initialDate) {
+      setFilterMode('DAY');
+      setSelectedDate(initialDate);
+    }
+  }, [initialDate]);
+
+  const formatMonthLabel = (yearMonth) => {
+    if (!yearMonth) return '';
+    const [y, m] = yearMonth.split('-');
+    const date = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
   const filteredSales = useMemo(() => {
     return (sales || [])
       .filter(s => {
         if (!s) return false;
         const q = searchTerm.toLowerCase().trim();
+        const payType = (s.paymentType || s.customer || 'Cash').trim();
+
+        // 1. Search text filter
         const matchesSearch = !q ||
           (s.id || '').toLowerCase().includes(q) ||
-          (s.paymentType || '').toLowerCase().includes(q) ||
-          (s.customer || '').toLowerCase().includes(q) ||
+          payType.toLowerCase().includes(q) ||
           ((s.items || []).some(item => (item.productName || '').toLowerCase().includes(q)));
 
-        let matchesDate = true;
-        if (selectedDate) {
-          const saleDate = s.localDate || (s.timestamp ? s.timestamp.split('T')[0] : '');
-          matchesDate = saleDate === selectedDate;
+        // 2. Payment Type filter
+        let matchesPayment = true;
+        if (selectedPayment !== 'ALL') {
+          matchesPayment = payType.toLowerCase() === selectedPayment.toLowerCase();
         }
 
-        return matchesSearch && matchesDate;
+        // 3. Date / Period filter
+        let matchesPeriod = true;
+        const saleDate = s.localDate || (s.timestamp ? s.timestamp.split('T')[0] : '');
+
+        if (filterMode === 'DAY') {
+          matchesPeriod = selectedDate ? saleDate === selectedDate : true;
+        } else if (filterMode === 'MONTH') {
+          matchesPeriod = selectedMonth ? saleDate.startsWith(selectedMonth) : true;
+        }
+
+        return matchesSearch && matchesPayment && matchesPeriod;
       })
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }, [sales, searchTerm, selectedDate]);
+  }, [sales, searchTerm, selectedPayment, filterMode, selectedDate, selectedMonth]);
 
   const totalFilteredRevenue = useMemo(() => filteredSales.reduce((sum, s) => sum + s.total, 0), [filteredSales]);
   const totalFilteredUnits = useMemo(() => filteredSales.reduce((sum, s) => sum + s.totalItems, 0), [filteredSales]);
 
-  // Export Sales to Excel (respects current date filter)
+  // Dynamic filter title for exports & summaries
+  const getFilterDescription = () => {
+    let periodDesc = 'All Recorded Time';
+    if (filterMode === 'DAY') {
+      periodDesc = selectedDate === todayStr ? 'Today' : selectedDate === yesterdayStr ? 'Yesterday' : selectedDate;
+    } else if (filterMode === 'MONTH') {
+      periodDesc = formatMonthLabel(selectedMonth);
+    }
+    const payDesc = selectedPayment === 'ALL' ? 'All Payment Types' : selectedPayment;
+    return `${payDesc} • ${periodDesc}`;
+  };
+
+  // Export Sales to Excel (respects payment and period filters)
   const handleExportExcel = () => {
     const now = new Date();
-    const dateTitle = selectedDate ? `Sales for ${selectedDate}` : `All Sales History`;
+    const filterDesc = getFilterDescription();
 
     const titleRows = [
-      [`JOTUN PAINT SHOP — ${dateTitle.toUpperCase()}`],
+      [`JOTUN PAINT SHOP — SALES REGISTER (${filterDesc.toUpperCase()})`],
       [`Exported: ${now.toLocaleDateString()} at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`],
       [`Total Transactions: ${filteredSales.length} | Units Sold: ${totalFilteredUnits} | Total Revenue: ${totalFilteredRevenue.toFixed(2)} ETB`],
       [""]
@@ -101,16 +150,18 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
       });
     });
 
+    const fileTag = `${selectedPayment.toLowerCase()}_${filterMode.toLowerCase()}`;
     downloadExcelCsv(
-      selectedDate ? `jotun_sales_${selectedDate}` : "jotun_sales_history",
+      `jotun_sales_${fileTag}`,
       headers,
       rows,
       titleRows
     );
   };
 
-  // Export Sales to PDF (respects current date filter)
+  // Export Sales to PDF (respects payment and period filters)
   const handleExportPdf = () => {
+    const filterDesc = getFilterDescription();
     const columns = ["Receipt #", "Date & Time", "Payment Type", "Items Purchased", "Units", "Total (ETB)"];
     const rows = filteredSales.map(sale => {
       const dt = new Date(sale.timestamp);
@@ -128,10 +179,8 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
     });
 
     printOrSaveAsPdf({
-      title: selectedDate ? `Jotun Sales Register — ${selectedDate}` : "Jotun Paint Sales History Report",
-      subtitle: selectedDate
-        ? `Filtered transactions for ${selectedDate}`
-        : `All recorded transactions as of ${new Date().toLocaleDateString()}`,
+      title: `Jotun Sales Register — ${filterDesc}`,
+      subtitle: `Filtered transactions as of ${new Date().toLocaleDateString()}`,
       columns,
       rows,
       summaryCards: [
@@ -147,7 +196,7 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
       <div className="page-header">
         <div>
           <h1 className="page-title">Sales History</h1>
-          <p className="page-subtitle">Track customer orders, daily receipts, and revenue in Birr (ETB)</p>
+          <p className="page-subtitle">Track receipts, bank collections (CBE, Telebirr, etc.), and daily/monthly revenue in Birr (ETB)</p>
         </div>
         <div className="header-actions-group">
           <button
@@ -177,44 +226,69 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
         </div>
       </div>
 
-      {/* Filter Toolbar: Search + Date Chooser */}
-      <div className="section-card mb-4" style={{ padding: '1rem 1.25rem' }}>
-        <div className="sales-toolbar-grid">
-          {/* Search Box */}
-          <div className="search-input-wrapper">
-            <SearchIcon size={18} className="search-icon" />
-            <input
-              type="text"
-              placeholder="Search by receipt # (e.g. SALE-1001), customer, or paint..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="form-input search-input"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                className="clear-search-btn"
-                onClick={() => setSearchTerm('')}
-              >
-                ✕
-              </button>
-            )}
+      {/* Filter Toolbar: Search + Date/Month Mode + Payment Type */}
+      <div className="section-card mb-4" style={{ padding: '1.15rem' }}>
+        {/* Row 1: Search Box */}
+        <div className="search-input-wrapper mb-3">
+          <SearchIcon size={18} className="search-icon" />
+          <input
+            type="text"
+            placeholder="Search by receipt # (e.g. SALE-1001), bank/cash, or paint name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="form-input search-input"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              className="clear-search-btn"
+              onClick={() => setSearchTerm('')}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Row 2: Period Selector (Day vs Month vs All) */}
+        <div className="sales-filter-row mb-3">
+          <div className="filter-group">
+            <span className="filter-group-label">View Period:</span>
+            <button
+              type="button"
+              className={`filter-toggle-btn ${filterMode === 'DAY' ? 'active' : ''}`}
+              onClick={() => setFilterMode('DAY')}
+            >
+              📅 Daily
+            </button>
+            <button
+              type="button"
+              className={`filter-toggle-btn ${filterMode === 'MONTH' ? 'active' : ''}`}
+              onClick={() => setFilterMode('MONTH')}
+            >
+              🗓️ Monthly
+            </button>
+            <button
+              type="button"
+              className={`filter-toggle-btn ${filterMode === 'ALL' ? 'active' : ''}`}
+              onClick={() => {
+                setFilterMode('ALL');
+                if (onClearDateFilter) onClearDateFilter();
+              }}
+            >
+              All Time
+            </button>
           </div>
 
-          {/* Date Chooser Controls */}
-          <div className="sales-date-chooser">
-            <div className="date-picker-field">
-              <span className="date-picker-label">Date:</span>
+          {/* If DAY mode: Date picker & Today / Yesterday presets */}
+          {filterMode === 'DAY' && (
+            <div className="filter-subgroup">
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="form-input sales-date-input"
-                title="Choose specific date"
+                className="sales-date-input"
+                title="Select specific date"
               />
-            </div>
-
-            <div className="quick-date-buttons">
               <button
                 type="button"
                 className={`quick-date-btn ${selectedDate === todayStr ? 'active' : ''}`}
@@ -229,34 +303,90 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
               >
                 Yesterday
               </button>
+            </div>
+          )}
+
+          {/* If MONTH mode: Month picker & This Month / Last Month presets */}
+          {filterMode === 'MONTH' && (
+            <div className="filter-subgroup">
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="sales-date-input"
+                title="Select specific month"
+              />
               <button
                 type="button"
-                className={`quick-date-btn ${!selectedDate ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedDate('');
-                  if (onClearDateFilter) onClearDateFilter();
-                }}
+                className={`quick-date-btn ${selectedMonth === currentMonthStr ? 'active' : ''}`}
+                onClick={() => setSelectedMonth(currentMonthStr)}
               >
-                All Dates
+                This Month
+              </button>
+              <button
+                type="button"
+                className={`quick-date-btn ${selectedMonth === lastMonthStr ? 'active' : ''}`}
+                onClick={() => setSelectedMonth(lastMonthStr)}
+              >
+                Last Month
               </button>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Active Date Summary Banner */}
-        {selectedDate && (
-          <div className="sales-day-summary-banner mt-3">
-            <div className="flex items-center gap-2">
-              <span className="badge-pill badge-primary">Day Filter: {selectedDate}</span>
-              <span className="text-sm text-muted">
-                Showing <strong>{filteredSales.length}</strong> sale(s) — <strong>{totalFilteredUnits}</strong> units sold
+        {/* Row 3: Payment Type Filter (Cash, CBE, Telebirr, Sinke, Coop, Awash, Dashen) */}
+        <div className="sales-filter-row">
+          <div className="filter-group">
+            <span className="filter-group-label">Payment / Bank:</span>
+            {['ALL', 'Cash', 'CBE', 'Telebirr', 'Sinke', 'Coop', 'Awash', 'Dashen'].map(type => (
+              <button
+                key={type}
+                type="button"
+                className={`filter-toggle-btn ${selectedPayment === type ? 'active' : ''}`}
+                onClick={() => setSelectedPayment(type)}
+              >
+                {type === 'ALL' ? 'All Payments' : type}
+              </button>
+            ))}
+          </div>
+
+          {(selectedPayment !== 'ALL' || filterMode !== 'DAY' || selectedDate !== todayStr) && (
+            <button
+              type="button"
+              className="btn-reset-filters"
+              onClick={() => {
+                setFilterMode('DAY');
+                setSelectedDate(todayStr);
+                setSelectedMonth(currentMonthStr);
+                setSelectedPayment('ALL');
+                setSearchTerm('');
+                if (onClearDateFilter) onClearDateFilter();
+              }}
+            >
+              Reset to Today ✕
+            </button>
+          )}
+        </div>
+
+        {/* Active Filter Answer Banner (e.g. "Total CBE in August") */}
+        <div className="sales-day-summary-banner mt-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="badge-pill badge-primary font-bold">
+                {getFilterDescription()}
+              </span>
+              <span className="text-xs text-muted">
+                <strong>{filteredSales.length}</strong> transactions • <strong>{totalFilteredUnits}</strong> units sold
               </span>
             </div>
-            <strong className="text-success text-md">
-              Day Total: {formatCurrency(totalFilteredRevenue)}
-            </strong>
+            <p className="text-xs text-muted" style={{ margin: 0 }}>
+              Live total of sales matching your selected bank & period
+            </p>
           </div>
-        )}
+          <strong className="text-success text-xl" style={{ fontWeight: 800 }}>
+            {formatCurrency(totalFilteredRevenue)}
+          </strong>
+        </div>
       </div>
 
       {/* Sales Table */}

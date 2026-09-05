@@ -406,14 +406,14 @@ export default function NewSale({ setActiveTab }) {
                     <span className="badge-pill badge-primary" style={{ fontSize: '11px' }}>{paymentType}</span>
                   </label>
                   <div className="payment-type-grid">
-                    {['Cash', 'CBE', 'Sinke', 'Coop', 'Awash', 'Dashen'].map(type => (
+                    {['Cash', 'CBE', 'Telebirr', 'Sinke', 'Coop', 'Awash', 'Dashen'].map(type => (
                       <button
                         key={type}
                         type="button"
                         className={`payment-type-btn ${paymentType === type ? 'active' : ''}`}
                         onClick={() => setPaymentType(type)}
                       >
-                        {type === 'Cash' ? '💵 Cash' : `🏦 ${type}`}
+                        {type === 'Cash' ? '💵 Cash' : type === 'Telebirr' ? '📱 Telebirr' : `🏦 ${type}`}
                       </button>
                     ))}
                   </div>
