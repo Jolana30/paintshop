@@ -87,7 +87,8 @@ export function StockProvider({ children }) {
           id: s.id,
           timestamp: s.created_at,
           localDate: getLocalDateString(s.created_at),
-          customer: s.customer || 'Cash Customer',
+          customer: s.customer || 'Cash',
+          paymentType: s.payment_type || s.customer || 'Cash',
           total: parseFloat(s.total) || 0,
           totalItems: parseInt(s.total_items, 10) || 1,
           items: (s.sale_items || []).map(item => ({
@@ -139,7 +140,7 @@ export function StockProvider({ children }) {
   };
 
   // Complete a sale (handles single item or cart)
-  const processSale = (cartItems, customerName = "Cash Walk-in") => {
+  const processSale = (cartItems, paymentType = "Cash", customerName = "") => {
     if (!cartItems || cartItems.length === 0) return false;
 
     // Check available stock
@@ -187,6 +188,7 @@ export function StockProvider({ children }) {
 
     const total = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    const finalPayment = paymentType || "Cash";
 
     const newSale = {
       id: saleId,
@@ -195,7 +197,8 @@ export function StockProvider({ children }) {
       items: cartItems,
       totalItems,
       total,
-      customer: customerName || "Cash Customer"
+      paymentType: finalPayment,
+      customer: customerName ? `${customerName} (${finalPayment})` : finalPayment
     };
 
     // 1. Instant optimistic state update

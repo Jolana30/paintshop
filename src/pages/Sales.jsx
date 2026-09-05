@@ -37,6 +37,7 @@ export default function Sales({ setActiveTab }) {
         const q = searchTerm.toLowerCase().trim();
         const matchesSearch = !q ||
           s.id.toLowerCase().includes(q) ||
+          (s.paymentType || '').toLowerCase().includes(q) ||
           s.customer.toLowerCase().includes(q) ||
           s.items.some(item => item.productName.toLowerCase().includes(q));
 
@@ -66,20 +67,21 @@ export default function Sales({ setActiveTab }) {
       [""]
     ];
 
-    const headers = ["Sale ID", "Date", "Time", "Customer", "Product Code", "Product Name", "Size", "Quantity", "Unit Price (ETB)", "Subtotal (ETB)", "Sale Total (ETB)"];
+    const headers = ["Sale ID", "Date", "Time", "Payment Type", "Product Code", "Product Name", "Size", "Quantity", "Unit Price (ETB)", "Subtotal (ETB)", "Sale Total (ETB)"];
     const rows = [];
 
     filteredSales.forEach(sale => {
       const dt = new Date(sale.timestamp);
       const dateStr = dt.toLocaleDateString();
       const timeStr = dt.toLocaleTimeString();
+      const payType = sale.paymentType || sale.customer || 'Cash';
 
       sale.items.forEach(item => {
         rows.push([
           sale.id,
           dateStr,
           timeStr,
-          sale.customer,
+          payType,
           item.code,
           item.productName,
           item.size,
@@ -101,14 +103,16 @@ export default function Sales({ setActiveTab }) {
 
   // Export Sales to PDF (respects current date filter)
   const handleExportPdf = () => {
-    const columns = ["Receipt #", "Date & Time", "Customer", "Items Purchased", "Units", "Total (ETB)"];
+    const columns = ["Receipt #", "Date & Time", "Payment Type", "Items Purchased", "Units", "Total (ETB)"];
     const rows = filteredSales.map(sale => {
       const dt = new Date(sale.timestamp);
       const itemsSummary = sale.items.map(i => `${i.quantity}x ${i.productName} (${i.size})`).join('<br/>');
+      const payType = sale.paymentType || sale.customer || 'Cash';
+
       return [
         `<strong>${sale.id}</strong>`,
         `${dt.toLocaleDateString()}<br/><small style="color:#64748b;">${dt.toLocaleTimeString()}</small>`,
-        sale.customer,
+        `<span style="color:#1e40af; font-weight:700;">${payType}</span>`,
         itemsSummary,
         `<strong>${sale.totalItems}</strong>`,
         `<strong style="color:#059669;">${formatCurrency(sale.total)}</strong>`
@@ -267,7 +271,7 @@ export default function Sales({ setActiveTab }) {
                   <tr>
                     <th>Receipt #</th>
                     <th>Date & Time</th>
-                    <th>Customer</th>
+                    <th>Payment Type</th>
                     <th>Items Breakdown</th>
                     <th>Total Units</th>
                     <th>Sale Total</th>
@@ -278,6 +282,7 @@ export default function Sales({ setActiveTab }) {
                   {filteredSales.map((sale, index) => {
                     const dt = new Date(sale.timestamp);
                     const isRecent = index === 0 && (Date.now() - dt.getTime() < 1000 * 60 * 10);
+                    const payType = sale.paymentType || sale.customer || 'Cash';
                     return (
                       <tr key={sale.id} className={isRecent ? 'row-recently-recorded' : ''}>
                         <td>
@@ -295,7 +300,7 @@ export default function Sales({ setActiveTab }) {
                           </div>
                         </td>
                         <td>
-                          <span className="badge-pill badge-neutral">{sale.customer}</span>
+                          <span className="badge-pill badge-neutral font-semibold">{payType}</span>
                         </td>
                         <td>
                           <div className="line-items-summary">
@@ -343,7 +348,7 @@ export default function Sales({ setActiveTab }) {
                             NEW
                           </span>
                         )}
-                        <span className="msc-customer">{sale.customer}</span>
+                        <span className="msc-customer font-semibold">{sale.paymentType || sale.customer || 'Cash'}</span>
                       </div>
                       <div className="msc-time">
                         <span>{dt.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
@@ -400,8 +405,10 @@ export default function Sales({ setActiveTab }) {
                     <span>{new Date(selectedSale.timestamp).toLocaleString()}</span>
                   </div>
                   <div>
-                    <span className="text-muted text-xs">Customer:</span>
-                    <span>{selectedSale.customer}</span>
+                    <span className="text-muted text-xs">Payment Method:</span>
+                    <strong className="badge-pill badge-neutral" style={{ display: 'inline-block', marginTop: '2px' }}>
+                      {selectedSale.paymentType || selectedSale.customer || 'Cash'}
+                    </strong>
                   </div>
                 </div>
               </div>

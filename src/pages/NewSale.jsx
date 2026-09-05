@@ -16,7 +16,7 @@ export default function NewSale({ setActiveTab }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [cart, setCart] = useState([]);
-  const [customerName, setCustomerName] = useState('');
+  const [paymentType, setPaymentType] = useState('Cash'); // 'Cash', 'CBE', 'Sinke', 'Coop', 'Awash', 'Dashen'
 
   // Extract unique categories
   const categories = useMemo(() => {
@@ -143,10 +143,10 @@ export default function NewSale({ setActiveTab }) {
       return;
     }
 
-    const completed = processSale(cart, customerName || "Cash Walk-in");
+    const completed = processSale(cart, paymentType);
     if (completed) {
       setCart([]);
-      setCustomerName('');
+      setPaymentType('Cash');
       // Navigate directly to Sales History so user immediately sees their recorded transaction
       setActiveTab('sales');
     }
@@ -401,14 +401,22 @@ export default function NewSale({ setActiveTab }) {
             {cart.length > 0 && (
               <form onSubmit={handleRecordSale} className="cart-footer">
                 <div className="form-group mb-3">
-                  <label className="form-label">Customer / Contractor Name (Optional)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Cash Walk-in, Contractor Ali"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="form-input"
-                  />
+                  <label className="form-label" style={{ fontWeight: 700, marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Payment Type:</span>
+                    <span className="badge-pill badge-primary" style={{ fontSize: '11px' }}>{paymentType}</span>
+                  </label>
+                  <div className="payment-type-grid">
+                    {['Cash', 'CBE', 'Sinke', 'Coop', 'Awash', 'Dashen'].map(type => (
+                      <button
+                        key={type}
+                        type="button"
+                        className={`payment-type-btn ${paymentType === type ? 'active' : ''}`}
+                        onClick={() => setPaymentType(type)}
+                      >
+                        {type === 'Cash' ? '💵 Cash' : `🏦 ${type}`}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="cart-financials">
