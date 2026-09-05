@@ -318,7 +318,7 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
               onClick={() => setShowDetails(prev => !prev)}
               title="Click to view monthly periods, all time, or bank breakdowns"
             >
-              <span>📊 View in Details</span>
+              <span>📅 Period & Banks</span>
               {hasActiveAdvancedFilters && <span className="details-active-dot" title="Custom filter active">●</span>}
               <span className="toggle-chevron">{showDetails ? '▴' : '▾'}</span>
             </button>
