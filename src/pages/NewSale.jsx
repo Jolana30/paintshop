@@ -394,18 +394,17 @@ export default function NewSale({ setActiveTab }) {
                   <div key={item.productId} className={`cart-item-card ${item.isTintable ? 'tintable-item-card' : ''}`}>
                     <div className="cart-item-row">
                       <div className="cart-item-info">
-                        <div className="flex items-center gap-1">
+                        <div className="cart-item-header-row">
                           <span className="cart-item-name">{item.productName}</span>
                           {item.isTintable && (
-                            <span className="badge-tag-tintable" title="Tintable Base - Colorant can be added from Jotun machine">
-                              TINTABLE BASE
+                            <span className="badge-tag-tintable" title="Tintable Base">
+                              Base
                             </span>
                           )}
                         </div>
                         <div className="cart-item-sub">
-                          <span className="cart-item-size">{item.size}</span>
-                          <span>•</span>
-                          <span>Base: {formatCurrency(item.unitPrice)}</span>
+                          <span className="cart-item-size-badge">{item.size}</span>
+                          <span className="cart-item-base-price">Base: {formatCurrency(item.unitPrice)}</span>
                         </div>
                       </div>
 
