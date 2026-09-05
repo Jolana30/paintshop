@@ -2872,20 +2872,46 @@
   border-radius: var(--radius-sm);
 }
 
+/* Sales Landing Controls Row */
+.sales-landing-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.25rem;
+}
+
+.sales-landing-date-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.sales-landing-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-left: auto;
+}
+
 /* Sales Details Drawer & Toggle Button */
 .btn-details-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.5rem;
   background-color: #f1f5f9;
   color: var(--text-main);
-  border: 1px solid var(--border-color);
-  padding: 0.42rem 0.85rem;
+  border: 1.5px solid var(--border-color);
+  padding: 0.45rem 0.95rem;
   border-radius: var(--radius-sm);
-  font-size: 0.82rem;
+  font-size: 0.83rem;
   font-weight: 700;
   cursor: pointer;
+  white-space: nowrap;
   transition: all 0.15s ease;
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-details-toggle:hover {
@@ -2915,9 +2941,10 @@
 .sales-details-drawer {
   border-top: 1px dashed var(--border-color);
   background-color: #fbfcfe;
-  padding: 0.85rem;
+  padding: 1rem 0.85rem;
   border-radius: var(--radius-sm);
   animation: fadeInDown 0.2s ease-out;
+  margin-top: 0.75rem;
 }
 
 @keyframes fadeInDown {
@@ -2930,6 +2957,28 @@
     transform: translateY(0);
   }
 }
+
+@media (max-width: 640px) {
+  .sales-landing-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  .sales-landing-actions {
+    margin-left: 0;
+    justify-content: space-between;
+  }
+  .btn-details-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+  .sales-day-summary-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}
+
 
 
 

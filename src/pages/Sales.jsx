@@ -256,9 +256,9 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
         </div>
 
         {/* Landing Control Row: Date quick-picker + View in Details button */}
-        <div className="sales-landing-row flex items-center justify-between gap-3 flex-wrap">
+        <div className="sales-landing-row">
           {/* Quick Date Switcher for Landing View */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="sales-landing-date-group">
             <span className="text-xs font-bold text-muted uppercase">Date:</span>
             <input
               type="date"
@@ -292,8 +292,8 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
             </button>
           </div>
 
-          {/* Expandable Details Button */}
-          <div className="flex items-center gap-2">
+          {/* Expandable Details Button & Reset action */}
+          <div className="sales-landing-actions">
             {hasActiveAdvancedFilters && (
               <button
                 type="button"
