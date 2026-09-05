@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStock } from '../context/StockContext';
 import {
   ReceiptTextIcon,
@@ -8,11 +8,18 @@ import {
 import { downloadExcelCsv } from '../utils/exportExcel';
 import { printOrSaveAsPdf } from '../utils/exportPdf';
 
-export default function Sales({ setActiveTab }) {
+export default function Sales({ setActiveTab, initialDate = '', onClearDateFilter }) {
   const { sales, formatCurrency } = useStock();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDate, setSelectedDate] = useState(''); // '' means all dates, or 'YYYY-MM-DD'
+  const [selectedDate, setSelectedDate] = useState(initialDate); // '' means all dates, or 'YYYY-MM-DD'
   const [selectedSale, setSelectedSale] = useState(null);
+
+  // Sync initialDate when navigating from dashboard
+  useEffect(() => {
+    if (initialDate !== undefined) {
+      setSelectedDate(initialDate);
+    }
+  }, [initialDate]);
 
   // Quick date presets
   const todayStr = useMemo(() => {
@@ -32,14 +39,15 @@ export default function Sales({ setActiveTab }) {
   }, []);
 
   const filteredSales = useMemo(() => {
-    return sales
+    return (sales || [])
       .filter(s => {
+        if (!s) return false;
         const q = searchTerm.toLowerCase().trim();
         const matchesSearch = !q ||
-          s.id.toLowerCase().includes(q) ||
+          (s.id || '').toLowerCase().includes(q) ||
           (s.paymentType || '').toLowerCase().includes(q) ||
-          s.customer.toLowerCase().includes(q) ||
-          s.items.some(item => item.productName.toLowerCase().includes(q));
+          (s.customer || '').toLowerCase().includes(q) ||
+          ((s.items || []).some(item => (item.productName || '').toLowerCase().includes(q)));
 
         let matchesDate = true;
         if (selectedDate) {
@@ -224,7 +232,10 @@ export default function Sales({ setActiveTab }) {
               <button
                 type="button"
                 className={`quick-date-btn ${!selectedDate ? 'active' : ''}`}
-                onClick={() => setSelectedDate('')}
+                onClick={() => {
+                  setSelectedDate('');
+                  if (onClearDateFilter) onClearDateFilter();
+                }}
               >
                 All Dates
               </button>

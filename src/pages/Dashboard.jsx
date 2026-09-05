@@ -1,5 +1,5 @@
 import React from 'react';
-import { useStock } from '../context/StockContext';
+import { useStock, getLocalDateString } from '../context/StockContext';
 import {
   ShoppingCartIcon,
   ArrowDownToDotIcon,
@@ -9,10 +9,19 @@ import {
   ReceiptTextIcon
 } from '../components/Icons';
 
-export default function Dashboard({ setActiveTab, onSelectStockInProduct }) {
+export default function Dashboard({ setActiveTab, onSelectStockInProduct, onViewSalesForDate }) {
   const { products, sales, todayRevenue, todayItemsSold, lowStockProducts, formatCurrency } = useStock();
 
   const recentSales = sales.slice(0, 5);
+
+  const handleOpenTodaySales = () => {
+    const todayStr = getLocalDateString();
+    if (onViewSalesForDate) {
+      onViewSalesForDate(todayStr);
+    } else {
+      setActiveTab('sales');
+    }
+  };
 
   return (
     <div className="page-container">
@@ -30,25 +39,41 @@ export default function Dashboard({ setActiveTab, onSelectStockInProduct }) {
 
       {/* Metric Cards */}
       <div className="stats-grid">
-        <div className="stat-card">
+        <div
+          className="stat-card stat-card-clickable"
+          onClick={handleOpenTodaySales}
+          style={{ cursor: 'pointer' }}
+          title="Click to view today's sales breakdown"
+        >
           <div className="stat-icon-wrap bg-blue-subtle text-primary">
             <ReceiptTextIcon size={22} />
           </div>
           <div className="stat-content">
-            <span className="stat-label">Today's Sales</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="stat-label">Today's Sales</span>
+              <span className="badge-pill badge-primary" style={{ fontSize: '10px' }}>View Sales ➔</span>
+            </div>
             <span className="stat-value">{formatCurrency(todayRevenue)}</span>
-            <span className="stat-subtext">Automated total (with 15% VAT)</span>
+            <span className="stat-subtext">Click to view daily transactions</span>
           </div>
         </div>
 
-        <div className="stat-card">
+        <div
+          className="stat-card stat-card-clickable"
+          onClick={handleOpenTodaySales}
+          style={{ cursor: 'pointer' }}
+          title="Click to view detailed items sold today"
+        >
           <div className="stat-icon-wrap bg-emerald-subtle text-success">
             <ShoppingCartIcon size={22} />
           </div>
           <div className="stat-content">
-            <span className="stat-label">Units Sold Today</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="stat-label">Units Sold Today</span>
+              <span className="badge-pill badge-healthy" style={{ fontSize: '10px' }}>View Details ➔</span>
+            </div>
             <span className="stat-value">{todayItemsSold}</span>
-            <span className="stat-subtext">Deducted automatically</span>
+            <span className="stat-subtext">Click to see what was sold today</span>
           </div>
         </div>
 

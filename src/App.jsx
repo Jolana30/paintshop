@@ -22,6 +22,7 @@ function MainLayout() {
   });
 
   const [stockInProductId, setStockInProductId] = useState(null);
+  const [salesFilterDate, setSalesFilterDate] = useState('');
   const { toast } = useStock();
 
   const setActiveTab = (tab) => {
@@ -32,6 +33,11 @@ function MainLayout() {
 
   const handleSelectStockIn = (prodId) => {
     setStockInProductId(prodId);
+  };
+
+  const handleViewSalesForDate = (dateStr) => {
+    setSalesFilterDate(dateStr);
+    setActiveTab('sales');
   };
 
   return (
@@ -46,6 +52,7 @@ function MainLayout() {
           <Dashboard
             setActiveTab={setActiveTab}
             onSelectStockInProduct={handleSelectStockIn}
+            onViewSalesForDate={handleViewSalesForDate}
           />
         )}
         {activeTab === 'newsale' && (
@@ -68,6 +75,8 @@ function MainLayout() {
         {activeTab === 'sales' && (
           <Sales
             setActiveTab={setActiveTab}
+            initialDate={salesFilterDate}
+            onClearDateFilter={() => setSalesFilterDate('')}
           />
         )}
         {activeTab === 'reports' && (
