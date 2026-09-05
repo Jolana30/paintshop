@@ -2872,6 +2872,66 @@
   border-radius: var(--radius-sm);
 }
 
+/* Sales Details Drawer & Toggle Button */
+.btn-details-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background-color: #f1f5f9;
+  color: var(--text-main);
+  border: 1px solid var(--border-color);
+  padding: 0.42rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-details-toggle:hover {
+  background-color: #e2e8f0;
+  border-color: #cbd5e1;
+  color: var(--primary);
+}
+
+.btn-details-toggle.active {
+  background-color: #eff6ff;
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.toggle-chevron {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.details-active-dot {
+  color: #2563eb;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.sales-details-drawer {
+  border-top: 1px dashed var(--border-color);
+  background-color: #fbfcfe;
+  padding: 0.85rem;
+  border-radius: var(--radius-sm);
+  animation: fadeInDown 0.2s ease-out;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
 
 
 

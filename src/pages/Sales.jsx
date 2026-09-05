@@ -48,6 +48,9 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
   const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
   const [selectedPayment, setSelectedPayment] = useState('ALL'); // 'ALL', 'Cash', 'CBE', 'Telebirr', 'Sinke', 'Coop', 'Awash', 'Dashen'
 
+  // Expandable advanced details drawer state
+  const [showDetails, setShowDetails] = useState(false);
+
   // Sync initialDate when navigating from dashboard
   useEffect(() => {
     if (initialDate) {
@@ -55,6 +58,9 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
       setSelectedDate(initialDate);
     }
   }, [initialDate]);
+
+  // Check if non-default filters are active (to highlight the details button)
+  const hasActiveAdvancedFilters = filterMode !== 'DAY' || selectedDate !== todayStr || selectedPayment !== 'ALL';
 
   const formatMonthLabel = (yearMonth) => {
     if (!yearMonth) return '';
@@ -249,124 +255,155 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
           )}
         </div>
 
-        {/* Row 2: Period Selector (Day vs Month vs All) */}
-        <div className="sales-filter-row mb-3">
-          <div className="filter-group">
-            <span className="filter-group-label">View Period:</span>
-            <button
-              type="button"
-              className={`filter-toggle-btn ${filterMode === 'DAY' ? 'active' : ''}`}
-              onClick={() => setFilterMode('DAY')}
-            >
-              📅 Daily
-            </button>
-            <button
-              type="button"
-              className={`filter-toggle-btn ${filterMode === 'MONTH' ? 'active' : ''}`}
-              onClick={() => setFilterMode('MONTH')}
-            >
-              🗓️ Monthly
-            </button>
-            <button
-              type="button"
-              className={`filter-toggle-btn ${filterMode === 'ALL' ? 'active' : ''}`}
-              onClick={() => {
-                setFilterMode('ALL');
-                if (onClearDateFilter) onClearDateFilter();
+        {/* Landing Control Row: Date quick-picker + View in Details button */}
+        <div className="sales-landing-row flex items-center justify-between gap-3 flex-wrap">
+          {/* Quick Date Switcher for Landing View */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-muted uppercase">Date:</span>
+            <input
+              type="date"
+              value={filterMode === 'DAY' ? selectedDate : ''}
+              onChange={(e) => {
+                setFilterMode('DAY');
+                setSelectedDate(e.target.value);
               }}
-            >
-              All Time
-            </button>
-          </div>
-
-          {/* If DAY mode: Date picker & Today / Yesterday presets */}
-          {filterMode === 'DAY' && (
-            <div className="filter-subgroup">
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="sales-date-input"
-                title="Select specific date"
-              />
-              <button
-                type="button"
-                className={`quick-date-btn ${selectedDate === todayStr ? 'active' : ''}`}
-                onClick={() => setSelectedDate(todayStr)}
-              >
-                Today
-              </button>
-              <button
-                type="button"
-                className={`quick-date-btn ${selectedDate === yesterdayStr ? 'active' : ''}`}
-                onClick={() => setSelectedDate(yesterdayStr)}
-              >
-                Yesterday
-              </button>
-            </div>
-          )}
-
-          {/* If MONTH mode: Month picker & This Month / Last Month presets */}
-          {filterMode === 'MONTH' && (
-            <div className="filter-subgroup">
-              <input
-                type="month"
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="sales-date-input"
-                title="Select specific month"
-              />
-              <button
-                type="button"
-                className={`quick-date-btn ${selectedMonth === currentMonthStr ? 'active' : ''}`}
-                onClick={() => setSelectedMonth(currentMonthStr)}
-              >
-                This Month
-              </button>
-              <button
-                type="button"
-                className={`quick-date-btn ${selectedMonth === lastMonthStr ? 'active' : ''}`}
-                onClick={() => setSelectedMonth(lastMonthStr)}
-              >
-                Last Month
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Row 3: Payment Type Filter (Cash, CBE, Telebirr, Sinke, Coop, Awash, Dashen) */}
-        <div className="sales-filter-row">
-          <div className="filter-group">
-            <span className="filter-group-label">Payment / Bank:</span>
-            {['ALL', 'Cash', 'CBE', 'Telebirr', 'Sinke', 'Coop', 'Awash', 'Dashen'].map(type => (
-              <button
-                key={type}
-                type="button"
-                className={`filter-toggle-btn ${selectedPayment === type ? 'active' : ''}`}
-                onClick={() => setSelectedPayment(type)}
-              >
-                {type === 'ALL' ? 'All Payments' : type}
-              </button>
-            ))}
-          </div>
-
-          {(selectedPayment !== 'ALL' || filterMode !== 'DAY' || selectedDate !== todayStr) && (
+              className="sales-date-input"
+              title="Pick a specific date"
+            />
             <button
               type="button"
-              className="btn-reset-filters"
+              className={`quick-date-btn ${filterMode === 'DAY' && selectedDate === todayStr ? 'active' : ''}`}
               onClick={() => {
                 setFilterMode('DAY');
                 setSelectedDate(todayStr);
-                setSelectedMonth(currentMonthStr);
-                setSelectedPayment('ALL');
-                setSearchTerm('');
-                if (onClearDateFilter) onClearDateFilter();
               }}
             >
-              Reset to Today ✕
+              Today
             </button>
-          )}
+            <button
+              type="button"
+              className={`quick-date-btn ${filterMode === 'DAY' && selectedDate === yesterdayStr ? 'active' : ''}`}
+              onClick={() => {
+                setFilterMode('DAY');
+                setSelectedDate(yesterdayStr);
+              }}
+            >
+              Yesterday
+            </button>
+          </div>
+
+          {/* Expandable Details Button */}
+          <div className="flex items-center gap-2">
+            {hasActiveAdvancedFilters && (
+              <button
+                type="button"
+                className="btn-reset-filters text-xs"
+                onClick={() => {
+                  setFilterMode('DAY');
+                  setSelectedDate(todayStr);
+                  setSelectedMonth(currentMonthStr);
+                  setSelectedPayment('ALL');
+                  setSearchTerm('');
+                  if (onClearDateFilter) onClearDateFilter();
+                }}
+                title="Reset to today's sales"
+              >
+                Reset to Today ✕
+              </button>
+            )}
+
+            <button
+              type="button"
+              className={`btn-details-toggle ${showDetails ? 'active' : ''}`}
+              onClick={() => setShowDetails(prev => !prev)}
+              title="Click to view monthly periods, all time, or bank breakdowns"
+            >
+              <span>📊 View in Details</span>
+              {hasActiveAdvancedFilters && <span className="details-active-dot" title="Custom filter active">●</span>}
+              <span className="toggle-chevron">{showDetails ? '▴' : '▾'}</span>
+            </button>
+          </div>
         </div>
+
+        {/* Expandable Details Drawer: Period Selector & Bank Breakdown */}
+        {showDetails && (
+          <div className="sales-details-drawer mt-3 pt-3">
+            {/* Period Selector (Daily vs Monthly vs All Time) */}
+            <div className="sales-filter-row mb-3">
+              <div className="filter-group">
+                <span className="filter-group-label">View Period:</span>
+                <button
+                  type="button"
+                  className={`filter-toggle-btn ${filterMode === 'DAY' ? 'active' : ''}`}
+                  onClick={() => setFilterMode('DAY')}
+                >
+                  📅 Daily
+                </button>
+                <button
+                  type="button"
+                  className={`filter-toggle-btn ${filterMode === 'MONTH' ? 'active' : ''}`}
+                  onClick={() => setFilterMode('MONTH')}
+                >
+                  🗓️ Monthly
+                </button>
+                <button
+                  type="button"
+                  className={`filter-toggle-btn ${filterMode === 'ALL' ? 'active' : ''}`}
+                  onClick={() => {
+                    setFilterMode('ALL');
+                    if (onClearDateFilter) onClearDateFilter();
+                  }}
+                >
+                  All Time
+                </button>
+              </div>
+
+              {/* Monthly Subgroup */}
+              {filterMode === 'MONTH' && (
+                <div className="filter-subgroup">
+                  <input
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="sales-date-input"
+                    title="Select specific month"
+                  />
+                  <button
+                    type="button"
+                    className={`quick-date-btn ${selectedMonth === currentMonthStr ? 'active' : ''}`}
+                    onClick={() => setSelectedMonth(currentMonthStr)}
+                  >
+                    This Month
+                  </button>
+                  <button
+                    type="button"
+                    className={`quick-date-btn ${selectedMonth === lastMonthStr ? 'active' : ''}`}
+                    onClick={() => setSelectedMonth(lastMonthStr)}
+                  >
+                    Last Month
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Payment Type Filter (Cash, CBE, Telebirr, Sinke, Coop, Awash, Dashen) */}
+            <div className="sales-filter-row">
+              <div className="filter-group">
+                <span className="filter-group-label">Payment / Bank:</span>
+                {['ALL', 'Cash', 'CBE', 'Telebirr', 'Sinke', 'Coop', 'Awash', 'Dashen'].map(type => (
+                  <button
+                    key={type}
+                    type="button"
+                    className={`filter-toggle-btn ${selectedPayment === type ? 'active' : ''}`}
+                    onClick={() => setSelectedPayment(type)}
+                  >
+                    {type === 'ALL' ? 'All Payments' : type}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Active Filter Answer Banner (e.g. "Total CBE in August") */}
         <div className="sales-day-summary-banner mt-3">
