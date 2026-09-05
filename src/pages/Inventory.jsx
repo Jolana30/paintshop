@@ -6,66 +6,40 @@ import {
   PlusIcon,
   RefreshCwIcon,
   CheckCircleIcon,
-  MinusIcon
+  MinusIcon,
+  AlertTriangleIcon
 } from '../components/Icons';
 import { downloadExcelCsv } from '../utils/exportExcel';
 import { printOrSaveAsPdf } from '../utils/exportPdf';
 
 export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
-  const { products, processStockAdjustment, lowStockProducts, formatCurrency, refreshData } = useStock();
+  const {
+    products,
+    todayItemsSold,
+    getSoldToday,
+    processStockAdjustment,
+    lowStockProducts,
+    formatCurrency,
+    refreshData
+  } = useStock();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL'); // ALL, INSTOCK, LOW, OUT
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedCategory, setSelectedCategory] = useState('ALL'); // ALL, Interior, Exterior
 
   // Quick edit modal
   const [editingProduct, setEditingProduct] = useState(null);
   const [editQty, setEditQty] = useState(0);
 
-  const categories = useMemo(() => {
-    return ['ALL', ...Array.from(new Set(products.map(p => p.category)))];
-  }, [products]);
-
-  // Dynamic breakdown of units by category
-  const categoryStats = useMemo(() => {
-    const stats = {
-      ALL: { units: 0, count: products.length }
-    };
-    products.forEach(p => {
-      stats.ALL.units += p.stock;
-      if (!stats[p.category]) {
-        stats[p.category] = { units: 0, count: 0 };
-      }
-      stats[p.category].units += p.stock;
-      stats[p.category].count += 1;
-    });
-    return stats;
-  }, [products]);
-
-  // Context-aware totals (matches active category selection)
-  const activeProductsByCategory = useMemo(() => {
-    return selectedCategory === 'ALL'
-      ? products
-      : products.filter(p => p.category === selectedCategory);
-  }, [products, selectedCategory]);
-
-  const activeUnits = useMemo(() => {
-    return activeProductsByCategory.reduce((sum, p) => sum + p.stock, 0);
-  }, [activeProductsByCategory]);
-
-  const activeValue = useMemo(() => {
-    return activeProductsByCategory.reduce((sum, p) => sum + (p.stock * p.priceWithVat), 0);
-  }, [activeProductsByCategory]);
-
-  const mostAvailableProduct = useMemo(() => {
-    const sorted = [...activeProductsByCategory].sort((a, b) => b.stock - a.stock);
-    return sorted.length > 0 && sorted[0].stock > 0 ? sorted[0] : null;
-  }, [activeProductsByCategory]);
-
   // Overall totals
   const totalUnits = useMemo(() => products.reduce((sum, p) => sum + p.stock, 0), [products]);
-  const totalValue = useMemo(() => products.reduce((sum, p) => sum + (p.stock * p.priceWithVat), 0), [products]);
   const outOfStockCount = useMemo(() => products.filter(p => p.stock === 0).length, [products]);
+  const lowStockCount = useMemo(() => products.filter(p => p.stock > 0 && p.stock <= p.minStock).length, [products]);
+  const inStockCount = useMemo(() => products.filter(p => p.stock > 0).length, [products]);
+
+  // Counts by category
+  const interiorProducts = useMemo(() => products.filter(p => p.category === 'Interior'), [products]);
+  const exteriorProducts = useMemo(() => products.filter(p => p.category === 'Exterior'), [products]);
 
   // Filtered list
   const filteredProducts = useMemo(() => {
@@ -78,7 +52,7 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
       if (filterStatus === 'INSTOCK') {
         matchesStatus = p.stock > 0;
       } else if (filterStatus === 'LOW') {
-        matchesStatus = p.stock <= p.minStock && p.stock > 0;
+        matchesStatus = p.stock > 0 && p.stock <= p.minStock;
       } else if (filterStatus === 'OUT') {
         matchesStatus = p.stock === 0;
       }
@@ -86,6 +60,14 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
       return matchesSearch && matchesCategory && matchesStatus;
     });
   }, [products, searchTerm, selectedCategory, filterStatus]);
+
+  const hasActiveFilters = searchTerm !== '' || selectedCategory !== 'ALL' || filterStatus !== 'ALL';
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('ALL');
+    setFilterStatus('ALL');
+  };
 
   const openQuickEdit = (product) => {
     setEditingProduct(product);
@@ -111,69 +93,119 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
     });
   };
 
+  // Export to Excel: Shop Header + 4 Core Columns (Name, Size, In Store, Sold Today)
   const handleExportExcel = () => {
-    const headers = [
-      "Product Code",
-      "Product Name",
-      "Category",
-      "Size",
-      "Current Stock",
-      "Min Safety Level",
-      "Unit Price (+15% VAT ETB)",
-      "Total Valuation (ETB)",
-      "Status"
+    const now = new Date();
+    const dateStr = now.toLocaleDateString();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const titleRows = [
+      ["JOTUN PAINT SHOP — INVENTORY STATUS"],
+      [`Date: ${dateStr}`, `Time: ${timeStr}`],
+      [`Total in Store: ${totalUnits} cans`, `Total Sold Today: ${todayItemsSold} cans`],
+      [""]
     ];
-    const rows = products.map(p => [
-      p.code,
-      p.name,
-      p.category,
-      p.size,
-      p.stock,
-      p.minStock,
-      p.priceWithVat.toFixed(2),
-      (p.stock * p.priceWithVat).toFixed(2),
-      p.stock === 0 ? "OUT_OF_STOCK" : p.stock <= p.minStock ? "LOW_STOCK" : "IN_STOCK"
-    ]);
-    downloadExcelCsv(`jotun_inventory_stock_${new Date().toISOString().split('T')[0]}`, headers, rows);
+
+    const headers = ["Product Name", "Size", "Current Inventory", "Total Sold Today"];
+    const rows = [];
+
+    // Interior Paints section
+    if (interiorProducts.length > 0) {
+      rows.push(["[ INTERIOR PAINTS ]", "", "", ""]);
+      interiorProducts.forEach(p => {
+        rows.push([p.name, p.size, p.stock, getSoldToday(p.id)]);
+      });
+      const intTotal = interiorProducts.reduce((sum, p) => sum + p.stock, 0);
+      const intSold = interiorProducts.reduce((sum, p) => sum + getSoldToday(p.id), 0);
+      rows.push(["Sub-total Interior", "", intTotal, intSold]);
+      rows.push(["", "", "", ""]);
+    }
+
+    // Exterior Paints section
+    if (exteriorProducts.length > 0) {
+      rows.push(["[ EXTERIOR PAINTS ]", "", "", ""]);
+      exteriorProducts.forEach(p => {
+        rows.push([p.name, p.size, p.stock, getSoldToday(p.id)]);
+      });
+      const extTotal = exteriorProducts.reduce((sum, p) => sum + p.stock, 0);
+      const extSold = exteriorProducts.reduce((sum, p) => sum + getSoldToday(p.id), 0);
+      rows.push(["Sub-total Exterior", "", extTotal, extSold]);
+      rows.push(["", "", "", ""]);
+    }
+
+    // Grand total
+    rows.push(["GRAND TOTAL IN STORE", "", totalUnits, todayItemsSold]);
+
+    downloadExcelCsv(
+      `jotun_inventory_${now.toISOString().split('T')[0]}`,
+      headers,
+      rows,
+      titleRows
+    );
   };
 
+  // Export to PDF: Clean Shop Header + 4 Core Columns
   const handleExportPdf = () => {
-    const columns = ["Code", "Product", "Size", "Stock", "Unit Price (+VAT)", "Total Value", "Status"];
-    const rows = products.map(p => [
-      p.code,
-      p.name,
-      p.size,
-      `<strong>${p.stock} units</strong>`,
-      formatCurrency(p.priceWithVat),
-      formatCurrency(p.stock * p.priceWithVat),
-      p.stock === 0
-        ? '<span style="color:#dc2626; font-weight:bold;">OUT</span>'
-        : p.stock <= p.minStock
-        ? '<span style="color:#d97706; font-weight:bold;">LOW</span>'
-        : '<span style="color:#059669; font-weight:bold;">OK</span>'
-    ]);
+    const now = new Date();
+    const dateStr = now.toLocaleDateString();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const columns = ["Product Name", "Size", "Current Inventory", "Total Sold Today"];
+    const rows = [];
+
+    if (interiorProducts.length > 0) {
+      rows.push([
+        `<strong style="color:#1e40af; font-size:13px; text-transform:uppercase;">Interior Paints</strong>`,
+        "", "", ""
+      ]);
+      interiorProducts.forEach(p => {
+        const sold = getSoldToday(p.id);
+        rows.push([
+          `<strong>${p.name}</strong>`,
+          p.size,
+          `<strong>${p.stock}</strong> units`,
+          sold > 0 ? `<strong style="color:#047857;">${sold} sold</strong>` : `<span style="color:#94a3b8;">0</span>`
+        ]);
+      });
+    }
+
+    if (exteriorProducts.length > 0) {
+      rows.push([
+        `<strong style="color:#1e40af; font-size:13px; text-transform:uppercase; margin-top:10px; display:inline-block;">Exterior Paints</strong>`,
+        "", "", ""
+      ]);
+      exteriorProducts.forEach(p => {
+        const sold = getSoldToday(p.id);
+        rows.push([
+          `<strong>${p.name}</strong>`,
+          p.size,
+          `<strong>${p.stock}</strong> units`,
+          sold > 0 ? `<strong style="color:#047857;">${sold} sold</strong>` : `<span style="color:#94a3b8;">0</span>`
+        ]);
+      });
+    }
 
     printOrSaveAsPdf({
-      title: "Jotun Paintshop Inventory Valuation",
-      subtitle: `Current stock on shelf & valuation as of ${new Date().toLocaleDateString()}`,
+      title: "Jotun Paint Shop — Inventory Status",
+      subtitle: `Official Stock Count as of ${dateStr} at ${timeStr}`,
       columns,
       rows,
       summaryCards: [
-        { label: "Total Paint Units", value: `${totalUnits} units` },
-        { label: "Total Inventory Value", value: formatCurrency(totalValue) },
-        { label: "Low Stock Items", value: `${lowStockProducts.length} items` },
-        { label: "Out of Stock Items", value: `${outOfStockCount} items` }
+        { label: "Total in Store", value: `${totalUnits} cans` },
+        { label: "Total Sold Today", value: `${todayItemsSold} cans` },
+        { label: "Low Stock Items", value: `${lowStockCount}` },
+        { label: "Out of Stock", value: `${outOfStockCount}` }
       ]
     });
   };
 
   return (
     <div className="page-container">
-      {/* Clean Top Header */}
+      {/* Page Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Inventory Stock</h1>
-          <p className="page-subtitle">Real-time stock counts and valuation in store</p>
+          <p className="page-subtitle">Real-time store stock and daily sales overview</p>
         </div>
         <div className="header-actions-group">
           <button
@@ -189,7 +221,7 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
             type="button"
             className="btn-export-excel"
             onClick={handleExportExcel}
-            title="Download inventory as Excel CSV"
+            title="Download clean inventory Excel spreadsheet"
           >
             📊 Excel
           </button>
@@ -197,7 +229,7 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
             type="button"
             className="btn-export-pdf"
             onClick={handleExportPdf}
-            title="Export / Print inventory as PDF"
+            title="Print or Save Inventory as PDF"
           >
             📄 PDF
           </button>
@@ -212,52 +244,65 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
         </div>
       </div>
 
-      {/* 4 Clean Snapshot Cards */}
-      <div className="simple-summary-row">
-        <div className="simple-stat-box">
-          <span className="simple-stat-label">
-            {selectedCategory === 'ALL' ? 'Total Shop Units' : `${selectedCategory} Units`}
-          </span>
-          <strong className="simple-stat-val text-primary">{activeUnits} units</strong>
-        </div>
-
-        <div className="simple-stat-box">
-          <span className="simple-stat-label">
-            {selectedCategory === 'ALL' ? 'Total Shop Valuation' : `${selectedCategory} Value`}
-          </span>
-          <strong className="simple-stat-val text-success">{formatCurrency(activeValue)}</strong>
-        </div>
-
-        <div className="simple-stat-box">
-          <span className="simple-stat-label">Most Available Paint</span>
-          {mostAvailableProduct ? (
-            <div className="most-avail-preview">
-              <strong className="simple-stat-val text-accent">{mostAvailableProduct.stock} units</strong>
-              <span className="text-xs text-muted truncate-1-line" title={mostAvailableProduct.name}>
-                {mostAvailableProduct.name} ({mostAvailableProduct.size})
-              </span>
+      {/* 4 Sleek Top Stats (Total in Store & Sold Today) */}
+      <div className="inventory-stats-ribbon mb-4">
+        <div className="stat-ribbon-card">
+          <div className="stat-ribbon-icon bg-blue-light text-primary">
+            <PackageIcon size={20} />
+          </div>
+          <div>
+            <span className="stat-ribbon-label">Total in Store</span>
+            <div className="stat-ribbon-value text-primary">
+              {totalUnits} <span className="stat-ribbon-sub">units</span>
             </div>
-          ) : (
-            <strong className="simple-stat-val text-muted">None</strong>
-          )}
+          </div>
         </div>
 
-        <div className="simple-stat-box">
-          <span className="simple-stat-label">Low / Out of Stock</span>
-          <strong className={`simple-stat-val ${lowStockProducts.length > 0 ? 'text-warning' : 'text-muted'}`}>
-            {lowStockProducts.length} items
-          </strong>
+        <div className="stat-ribbon-card">
+          <div className="stat-ribbon-icon bg-emerald-light text-success">
+            <CheckCircleIcon size={20} />
+          </div>
+          <div>
+            <span className="stat-ribbon-label">Sold Today</span>
+            <div className="stat-ribbon-value text-success">
+              {todayItemsSold} <span className="stat-ribbon-sub">units</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-ribbon-card">
+          <div className="stat-ribbon-icon bg-amber-light text-warning">
+            <AlertTriangleIcon size={20} />
+          </div>
+          <div>
+            <span className="stat-ribbon-label">Low Stock</span>
+            <div className={`stat-ribbon-value ${lowStockCount > 0 ? 'text-warning' : 'text-muted'}`}>
+              {lowStockCount} <span className="stat-ribbon-sub">items</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-ribbon-card">
+          <div className="stat-ribbon-icon bg-red-light text-danger">
+            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>⛔</span>
+          </div>
+          <div>
+            <span className="stat-ribbon-label">Out of Stock</span>
+            <div className={`stat-ribbon-value ${outOfStockCount > 0 ? 'text-danger' : 'text-muted'}`}>
+              {outOfStockCount} <span className="stat-ribbon-sub">items</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Clean Search & Filters Toolbar */}
-      <div className="inventory-clean-toolbar">
-        {/* Search input */}
-        <div className="search-input-wrapper">
+      {/* Search & Flexible Filter Buttons Toolbar */}
+      <div className="inventory-unified-toolbar mb-4">
+        {/* Search Bar */}
+        <div className="search-input-wrapper mb-3">
           <SearchIcon size={18} className="search-icon" />
           <input
             type="text"
-            placeholder="Search paint by name or code (e.g. FENOMASTIC, 15L, 6URMAWCSA)..."
+            placeholder="Search paint name or Part Code (e.g. Fenomastic, 15L, 6UR)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="form-input search-input"
@@ -273,77 +318,115 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
           )}
         </div>
 
-        {/* Category Horizontal Chips */}
-        <div className="category-chips-container">
-          {categories.map(cat => {
-            const stat = categoryStats[cat] || { units: 0, count: 0 };
-            return (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={`chip-btn ${selectedCategory === cat ? 'active' : ''}`}
-              >
-                {cat === 'ALL' ? 'All' : cat} ({stat.units} units)
-              </button>
-            );
-          })}
-        </div>
+        {/* Flexible Filter Buttons Bar */}
+        <div className="filter-controls-row">
+          {/* Category Group */}
+          <div className="filter-group">
+            <span className="filter-group-label">Category:</span>
+            <button
+              type="button"
+              className={`filter-toggle-btn ${selectedCategory === 'ALL' ? 'active' : ''}`}
+              onClick={() => setSelectedCategory('ALL')}
+            >
+              All ({products.length})
+            </button>
+            <button
+              type="button"
+              className={`filter-toggle-btn ${selectedCategory === 'Interior' ? 'active' : ''}`}
+              onClick={() => setSelectedCategory('Interior')}
+            >
+              Interior ({interiorProducts.length})
+            </button>
+            <button
+              type="button"
+              className={`filter-toggle-btn ${selectedCategory === 'Exterior' ? 'active' : ''}`}
+              onClick={() => setSelectedCategory('Exterior')}
+            >
+              Exterior ({exteriorProducts.length})
+            </button>
+          </div>
 
-        {/* Status Pills */}
-        <div className="status-filter-pills">
-          <button
-            type="button"
-            className={`pill-btn ${filterStatus === 'ALL' ? 'active' : ''}`}
-            onClick={() => setFilterStatus('ALL')}
-          >
-            All Products ({products.length})
-          </button>
-          <button
-            type="button"
-            className={`pill-btn ${filterStatus === 'INSTOCK' ? 'active' : ''}`}
-            onClick={() => setFilterStatus('INSTOCK')}
-          >
-            In Stock ({products.filter(p => p.stock > 0).length})
-          </button>
-          <button
-            type="button"
-            className={`pill-btn pill-warning ${filterStatus === 'LOW' ? 'active' : ''}`}
-            onClick={() => setFilterStatus('LOW')}
-          >
-            Low Stock ({lowStockProducts.length})
-          </button>
-          <button
-            type="button"
-            className={`pill-btn pill-danger ${filterStatus === 'OUT' ? 'active' : ''}`}
-            onClick={() => setFilterStatus('OUT')}
-          >
-            Out of Stock ({outOfStockCount})
-          </button>
+          {/* Status Group */}
+          <div className="filter-group">
+            <span className="filter-group-label">Status:</span>
+            <button
+              type="button"
+              className={`filter-toggle-btn ${filterStatus === 'ALL' ? 'active' : ''}`}
+              onClick={() => setFilterStatus('ALL')}
+            >
+              All Status
+            </button>
+            <button
+              type="button"
+              className={`filter-toggle-btn ${filterStatus === 'INSTOCK' ? 'active' : ''}`}
+              onClick={() => setFilterStatus('INSTOCK')}
+            >
+              In Stock ({inStockCount})
+            </button>
+            <button
+              type="button"
+              className={`filter-toggle-btn btn-warning-pill ${filterStatus === 'LOW' ? 'active' : ''}`}
+              onClick={() => setFilterStatus('LOW')}
+            >
+              Low ({lowStockCount})
+            </button>
+            <button
+              type="button"
+              className={`filter-toggle-btn btn-danger-pill ${filterStatus === 'OUT' ? 'active' : ''}`}
+              onClick={() => setFilterStatus('OUT')}
+            >
+              Out ({outOfStockCount})
+            </button>
+          </div>
+
+          {/* Reset Action */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              className="btn-reset-filters"
+              onClick={resetFilters}
+            >
+              Reset Filters ✕
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Products Table (Desktop) & Cards (Mobile) */}
+      {/* Main Products Table (Desktop) & Cards (Mobile) */}
       <div className="section-card">
+        <div className="table-header-bar" style={{ padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span className="text-xs font-bold uppercase tracking-wider text-muted">
+            Showing {filteredProducts.length} of {products.length} Products
+          </span>
+        </div>
+
         {filteredProducts.length === 0 ? (
           <div className="empty-state">
             <PackageIcon size={40} className="text-muted" />
-            <p>No products found matching your search.</p>
+            <p>No products found matching your search or filters.</p>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                className="btn-outline mt-2"
+                onClick={resetFilters}
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
         ) : (
           <>
-            {/* Desktop & Tablet Table */}
+            {/* Desktop Table */}
             <div className="table-responsive desktop-only-table">
               <table className="data-table">
                 <thead>
                   <tr>
                     <th>Part Code</th>
-                    <th>Product Description</th>
+                    <th>Product Name</th>
                     <th>Size</th>
-                    <th>Current Stock</th>
+                    <th className="text-center">In Store</th>
+                    <th className="text-center column-sold-today">Sold Today</th>
                     <th>Status</th>
-                    <th>Price (+15% VAT)</th>
-                    <th>Total Value</th>
                     <th className="text-right">Actions</th>
                   </tr>
                 </thead>
@@ -351,6 +434,7 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
                   {filteredProducts.map(product => {
                     const isOut = product.stock === 0;
                     const isLow = product.stock <= product.minStock && !isOut;
+                    const soldToday = getSoldToday(product.id);
 
                     return (
                       <tr key={product.id} className={isOut ? 'row-out' : isLow ? 'row-low' : ''}>
@@ -366,11 +450,18 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
                         <td>
                           <span className="badge-tag">{product.size}</span>
                         </td>
-                        <td>
+                        <td className="text-center">
                           <strong className={`stock-number-large ${isOut ? 'text-danger' : isLow ? 'text-warning' : 'text-primary'}`}>
                             {product.stock}
                           </strong>
                           <span className="text-xs text-muted ml-1">units</span>
+                        </td>
+                        <td className="text-center column-sold-today-cell">
+                          {soldToday > 0 ? (
+                            <strong className="sold-today-badge">{soldToday} sold</strong>
+                          ) : (
+                            <span className="text-muted font-mono">0</span>
+                          )}
                         </td>
                         <td>
                           {isOut ? (
@@ -380,12 +471,6 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
                           ) : (
                             <span className="badge-pill badge-healthy">IN STOCK</span>
                           )}
-                        </td>
-                        <td>
-                          <strong>{formatCurrency(product.priceWithVat)}</strong>
-                        </td>
-                        <td>
-                          <span className="text-muted">{formatCurrency(product.stock * product.priceWithVat)}</span>
                         </td>
                         <td className="text-right">
                           <div className="actions-cell-flex justify-end">
@@ -422,6 +507,7 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
               {filteredProducts.map(product => {
                 const isOut = product.stock === 0;
                 const isLow = product.stock <= product.minStock && !isOut;
+                const soldToday = getSoldToday(product.id);
 
                 return (
                   <div key={product.id} className={`mobile-product-card ${isOut ? 'card-out' : isLow ? 'card-low' : ''}`}>
@@ -438,15 +524,21 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
                     <h4 className="mpc-name">{product.name}</h4>
                     <div className="mpc-sub">
                       <span>{product.category}</span>
-                      <span>•</span>
-                      <strong>{formatCurrency(product.priceWithVat)}</strong>
                     </div>
 
-                    <div className="mpc-stock-highlight">
-                      <span className="mpc-stock-label">Available on Shelf:</span>
-                      <strong className={`mpc-stock-qty ${isOut ? 'text-danger' : isLow ? 'text-warning' : 'text-primary'}`}>
-                        {product.stock} units
-                      </strong>
+                    <div className="mpc-stock-grid-row">
+                      <div className="mpc-stock-box">
+                        <span className="mpc-label">In Store</span>
+                        <strong className={`mpc-val ${isOut ? 'text-danger' : isLow ? 'text-warning' : 'text-primary'}`}>
+                          {product.stock} units
+                        </strong>
+                      </div>
+                      <div className="mpc-stock-box mpc-sold-box">
+                        <span className="mpc-label">Sold Today</span>
+                        <strong className={`mpc-val ${soldToday > 0 ? 'text-success' : 'text-muted'}`}>
+                          {soldToday} units
+                        </strong>
+                      </div>
                     </div>
 
                     <div className="mpc-actions">

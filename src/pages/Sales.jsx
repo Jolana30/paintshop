@@ -11,23 +11,65 @@ import { printOrSaveAsPdf } from '../utils/exportPdf';
 export default function Sales({ setActiveTab }) {
   const { sales, formatCurrency } = useStock();
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDate, setSelectedDate] = useState(''); // '' means all dates, or 'YYYY-MM-DD'
   const [selectedSale, setSelectedSale] = useState(null);
 
-  const filteredSales = sales.filter(s => {
-    const q = searchTerm.toLowerCase().trim();
-    if (!q) return true;
-    const matchesId = s.id.toLowerCase().includes(q);
-    const matchesCustomer = s.customer.toLowerCase().includes(q);
-    const matchesProduct = s.items.some(item => item.productName.toLowerCase().includes(q));
-    return matchesId || matchesCustomer || matchesProduct;
-  });
+  // Quick date presets
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
 
-  // Export Sales to Excel
+  const yesterdayStr = useMemo(() => {
+    const d = new Date(Date.now() - 86400000);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const filteredSales = useMemo(() => {
+    return sales
+      .filter(s => {
+        const q = searchTerm.toLowerCase().trim();
+        const matchesSearch = !q ||
+          s.id.toLowerCase().includes(q) ||
+          s.customer.toLowerCase().includes(q) ||
+          s.items.some(item => item.productName.toLowerCase().includes(q));
+
+        let matchesDate = true;
+        if (selectedDate) {
+          const saleDate = s.localDate || (s.timestamp ? s.timestamp.split('T')[0] : '');
+          matchesDate = saleDate === selectedDate;
+        }
+
+        return matchesSearch && matchesDate;
+      })
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }, [sales, searchTerm, selectedDate]);
+
+  const totalFilteredRevenue = useMemo(() => filteredSales.reduce((sum, s) => sum + s.total, 0), [filteredSales]);
+  const totalFilteredUnits = useMemo(() => filteredSales.reduce((sum, s) => sum + s.totalItems, 0), [filteredSales]);
+
+  // Export Sales to Excel (respects current date filter)
   const handleExportExcel = () => {
+    const now = new Date();
+    const dateTitle = selectedDate ? `Sales for ${selectedDate}` : `All Sales History`;
+
+    const titleRows = [
+      [`JOTUN PAINT SHOP — ${dateTitle.toUpperCase()}`],
+      [`Exported: ${now.toLocaleDateString()} at ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`],
+      [`Total Transactions: ${filteredSales.length} | Units Sold: ${totalFilteredUnits} | Total Revenue: ${totalFilteredRevenue.toFixed(2)} ETB`],
+      [""]
+    ];
+
     const headers = ["Sale ID", "Date", "Time", "Customer", "Product Code", "Product Name", "Size", "Quantity", "Unit Price (ETB)", "Subtotal (ETB)", "Sale Total (ETB)"];
     const rows = [];
 
-    sales.forEach(sale => {
+    filteredSales.forEach(sale => {
       const dt = new Date(sale.timestamp);
       const dateStr = dt.toLocaleDateString();
       const timeStr = dt.toLocaleTimeString();
@@ -49,13 +91,18 @@ export default function Sales({ setActiveTab }) {
       });
     });
 
-    downloadExcelCsv("jotun_sales_history", headers, rows);
+    downloadExcelCsv(
+      selectedDate ? `jotun_sales_${selectedDate}` : "jotun_sales_history",
+      headers,
+      rows,
+      titleRows
+    );
   };
 
-  // Export Sales to PDF
+  // Export Sales to PDF (respects current date filter)
   const handleExportPdf = () => {
     const columns = ["Receipt #", "Date & Time", "Customer", "Items Purchased", "Units", "Total (ETB)"];
-    const rows = sales.map(sale => {
+    const rows = filteredSales.map(sale => {
       const dt = new Date(sale.timestamp);
       const itemsSummary = sale.items.map(i => `${i.quantity}x ${i.productName} (${i.size})`).join('<br/>');
       return [
@@ -68,18 +115,17 @@ export default function Sales({ setActiveTab }) {
       ];
     });
 
-    const totalRevenue = sales.reduce((sum, s) => sum + s.total, 0);
-    const totalUnits = sales.reduce((sum, s) => sum + s.totalItems, 0);
-
     printOrSaveAsPdf({
-      title: "Jotun Paint Sales History Report",
-      subtitle: `Recorded sales transactions as of ${new Date().toLocaleDateString()}`,
+      title: selectedDate ? `Jotun Sales Register — ${selectedDate}` : "Jotun Paint Sales History Report",
+      subtitle: selectedDate
+        ? `Filtered transactions for ${selectedDate}`
+        : `All recorded transactions as of ${new Date().toLocaleDateString()}`,
       columns,
       rows,
       summaryCards: [
-        { label: "Total Transactions", value: sales.length },
-        { label: "Total Units Sold", value: totalUnits },
-        { label: "Gross Revenue", value: formatCurrency(totalRevenue) }
+        { label: "Transactions", value: filteredSales.length },
+        { label: "Units Sold", value: totalFilteredUnits },
+        { label: "Gross Revenue", value: formatCurrency(totalFilteredRevenue) }
       ]
     });
   };
@@ -89,7 +135,7 @@ export default function Sales({ setActiveTab }) {
       <div className="page-header">
         <div>
           <h1 className="page-title">Sales History</h1>
-          <p className="page-subtitle">Track customer orders, receipts, and paint transactions in Birr (ETB)</p>
+          <p className="page-subtitle">Track customer orders, daily receipts, and revenue in Birr (ETB)</p>
         </div>
         <div className="header-actions-group">
           <button
@@ -119,27 +165,83 @@ export default function Sales({ setActiveTab }) {
         </div>
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="section-card mb-4">
-        <div className="search-input-wrapper">
-          <SearchIcon size={18} className="search-icon" />
-          <input
-            type="text"
-            placeholder="Search by receipt # (e.g. SALE-1001), customer name, or paint..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="form-input search-input"
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              className="clear-search-btn"
-              onClick={() => setSearchTerm('')}
-            >
-              ✕
-            </button>
-          )}
+      {/* Filter Toolbar: Search + Date Chooser */}
+      <div className="section-card mb-4" style={{ padding: '1rem 1.25rem' }}>
+        <div className="sales-toolbar-grid">
+          {/* Search Box */}
+          <div className="search-input-wrapper">
+            <SearchIcon size={18} className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search by receipt # (e.g. SALE-1001), customer, or paint..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="form-input search-input"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                className="clear-search-btn"
+                onClick={() => setSearchTerm('')}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Date Chooser Controls */}
+          <div className="sales-date-chooser">
+            <div className="date-picker-field">
+              <span className="date-picker-label">Date:</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="form-input sales-date-input"
+                title="Choose specific date"
+              />
+            </div>
+
+            <div className="quick-date-buttons">
+              <button
+                type="button"
+                className={`quick-date-btn ${selectedDate === todayStr ? 'active' : ''}`}
+                onClick={() => setSelectedDate(todayStr)}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                className={`quick-date-btn ${selectedDate === yesterdayStr ? 'active' : ''}`}
+                onClick={() => setSelectedDate(yesterdayStr)}
+              >
+                Yesterday
+              </button>
+              <button
+                type="button"
+                className={`quick-date-btn ${!selectedDate ? 'active' : ''}`}
+                onClick={() => setSelectedDate('')}
+              >
+                All Dates
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Active Date Summary Banner */}
+        {selectedDate && (
+          <div className="sales-day-summary-banner mt-3">
+            <div className="flex items-center gap-2">
+              <span className="badge-pill badge-primary">Day Filter: {selectedDate}</span>
+              <span className="text-sm text-muted">
+                Showing <strong>{filteredSales.length}</strong> sale(s) — <strong>{totalFilteredUnits}</strong> units sold
+              </span>
+            </div>
+            <strong className="text-success text-md">
+              Day Total: {formatCurrency(totalFilteredRevenue)}
+            </strong>
+          </div>
+        )}
       </div>
 
       {/* Sales Table */}

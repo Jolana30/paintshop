@@ -379,6 +379,24 @@ export function StockProvider({ children }) {
   const todayItemsSold = todaySalesList.reduce((sum, s) => sum + s.totalItems, 0);
   const lowStockProducts = products.filter(p => p.stock <= p.minStock);
 
+  // Per-product units sold today
+  const todayProductSalesMap = React.useMemo(() => {
+    const map = {};
+    todaySalesList.forEach(s => {
+      (s.items || []).forEach(item => {
+        const id = item.productId;
+        if (id) {
+          map[id] = (map[id] || 0) + (Number(item.quantity) || 0);
+        }
+      });
+    });
+    return map;
+  }, [todaySalesList]);
+
+  const getSoldToday = useCallback((productId) => {
+    return todayProductSalesMap[productId] || 0;
+  }, [todayProductSalesMap]);
+
   return (
     <StockContext.Provider
       value={{
@@ -388,6 +406,8 @@ export function StockProvider({ children }) {
         todayRevenue,
         todayItemsSold,
         todaySalesList,
+        todayProductSalesMap,
+        getSoldToday,
         lowStockProducts,
         processSale,
         quickSaleSingleItem,

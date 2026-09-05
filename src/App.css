@@ -2512,3 +2512,313 @@
   }
 }
 
+/* ==========================================================================
+   New Modern Inventory UI & Filter Styles
+   ========================================================================== */
+
+.inventory-stats-ribbon {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.85rem;
+}
+
+.stat-ribbon-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 0.85rem 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.15s ease;
+}
+
+.stat-ribbon-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: var(--shadow-md);
+}
+
+.stat-ribbon-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bg-blue-light { background-color: #eff6ff; }
+.bg-emerald-light { background-color: #ecfdf5; }
+.bg-amber-light { background-color: #fffbeb; }
+.bg-red-light { background-color: #fef2f2; }
+
+.stat-ribbon-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  display: block;
+}
+
+.stat-ribbon-value {
+  font-size: 1.3rem;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-top: 2px;
+}
+
+.stat-ribbon-sub {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.inventory-unified-toolbar {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.filter-controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.filter-group-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  margin-right: 0.25rem;
+}
+
+.filter-toggle-btn {
+  background-color: var(--bg-surface-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 0.35rem 0.8rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-toggle-btn:hover {
+  background-color: #e2e8f0;
+}
+
+.filter-toggle-btn.active {
+  background-color: var(--primary-color, #1e40af) !important;
+  color: #ffffff !important;
+  border-color: #1e3a8a !important;
+}
+
+.filter-toggle-btn.btn-warning-pill.active {
+  background-color: #d97706 !important;
+  border-color: #b45309 !important;
+}
+
+.filter-toggle-btn.btn-danger-pill.active {
+  background-color: #dc2626 !important;
+  border-color: #b91c1c !important;
+}
+
+.btn-reset-filters {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+}
+
+.btn-reset-filters:hover {
+  background-color: #fef2f2;
+}
+
+.column-sold-today {
+  background-color: #f0fdf4;
+  color: #15803d;
+}
+
+.column-sold-today-cell {
+  background-color: #f0fdf4;
+}
+
+.sold-today-badge {
+  color: #047857;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.mpc-stock-grid-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.mpc-stock-box {
+  background: var(--bg-surface-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.mpc-sold-box {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.mpc-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.mpc-val {
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin-top: 2px;
+}
+
+@media (max-width: 900px) {
+  .inventory-stats-ribbon {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .inventory-stats-ribbon {
+    grid-template-columns: 1fr;
+  }
+  .filter-controls-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* ==========================================================================
+   Sales History Date Picker & Summary Styles
+   ========================================================================== */
+
+.sales-toolbar-grid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.sales-toolbar-grid .search-input-wrapper {
+  flex: 1;
+  min-width: 260px;
+}
+
+.sales-date-chooser {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.date-picker-field {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.date-picker-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.sales-date-input {
+  padding: 0.4rem 0.65rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  font-family: inherit;
+}
+
+.quick-date-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.quick-date-btn {
+  background-color: var(--bg-surface-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 0.4rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quick-date-btn:hover {
+  background-color: #e2e8f0;
+}
+
+.quick-date-btn.active {
+  background-color: var(--primary-color, #1e40af) !important;
+  color: #ffffff !important;
+  border-color: #1e3a8a !important;
+}
+
+.sales-day-summary-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .sales-toolbar-grid {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sales-date-chooser {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+
+
