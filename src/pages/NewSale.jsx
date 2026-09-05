@@ -158,7 +158,7 @@ export default function NewSale({ setActiveTab }) {
   };
 
   // Update colorant cost for tintable base cans directly from Jotun machine
-  // In Jotun Colour Manager, if user selected 3 cans, machine already outputs the total colorant cost!
+  // In Jotun Colour Manager, if user selected multiple cans, machine already outputs the total colorant cost!
   const updateColorantCost = (productId, costInput) => {
     const cost = parseFloat(costInput);
     const validCost = isNaN(cost) || cost < 0 ? 0 : cost;
@@ -173,6 +173,7 @@ export default function NewSale({ setActiveTab }) {
           return {
             ...item,
             colorantCost: validCost,
+            colorantCostInput: costInput === '' ? '' : costInput,
             colorantWithVat: machineTotal - (item.quantity * item.unitPrice),
             subtotal: machineTotal
           };
@@ -484,16 +485,16 @@ export default function NewSale({ setActiveTab }) {
                             step="0.01"
                             min="0"
                             placeholder="0.00"
-                            value={item.colorantCost || ''}
+                            value={item.colorantCostInput !== undefined ? item.colorantCostInput : (item.colorantCost || '')}
                             onChange={(e) => updateColorantCost(item.productId, e.target.value)}
                             className="colorant-number-input"
                             title="Enter colorant cost from machine"
                           />
-                          {item.colorantCost > 0 && (
+                          {(item.colorantCost > 0 || item.colorantCostInput) && (
                             <button
                               type="button"
                               className="clear-colorant-btn"
-                              onClick={() => updateColorantCost(item.productId, 0)}
+                              onClick={() => updateColorantCost(item.productId, '')}
                               title="Clear colorant"
                             >
                               ✕
@@ -682,16 +683,16 @@ export default function NewSale({ setActiveTab }) {
                             step="0.01"
                             min="0"
                             placeholder="0.00"
-                            value={item.colorantCost || ''}
+                            value={item.colorantCostInput !== undefined ? item.colorantCostInput : (item.colorantCost || '')}
                             onChange={(e) => updateColorantCost(item.productId, e.target.value)}
                             className="colorant-number-input"
                             title="Enter colorant cost from machine"
                           />
-                          {item.colorantCost > 0 && (
+                          {(item.colorantCost > 0 || item.colorantCostInput) && (
                             <button
                               type="button"
                               className="clear-colorant-btn"
-                              onClick={() => updateColorantCost(item.productId, 0)}
+                              onClick={() => updateColorantCost(item.productId, '')}
                               title="Clear colorant"
                             >
                               ✕
