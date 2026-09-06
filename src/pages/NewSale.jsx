@@ -8,7 +8,8 @@ import {
   ShoppingCartIcon,
   CheckCircleIcon,
   RefreshCwIcon,
-  AlertTriangleIcon
+  AlertTriangleIcon,
+  PackageIcon
 } from '../components/Icons';
 
 export default function NewSale({ setActiveTab }) {
@@ -315,6 +316,15 @@ export default function NewSale({ setActiveTab }) {
           <button
             type="button"
             className="btn-outline-sm"
+            onClick={() => setActiveTab('inventory')}
+            title="View store inventory & current stock"
+          >
+            <PackageIcon size={15} />
+            Inventory Stock
+          </button>
+          <button
+            type="button"
+            className="btn-outline-sm"
             onClick={() => setActiveTab('sales')}
           >
             View Sales History ➔
@@ -491,7 +501,7 @@ export default function NewSale({ setActiveTab }) {
                   <div key={item.productId} className={`cart-item-card ${item.isTintable ? 'tintable-item-card' : ''}`}>
                     <div className="cart-item-row">
                       <div className="cart-item-info">
-                        <span className="cart-item-name">{item.productName}</span>
+                        <span className="cart-item-name" title={item.productName}>{item.productName}</span>
                         <div className="cart-item-sub">
                           <span className="cart-item-size-badge">{item.size}</span>
                           <span className="cart-item-base-price">Base: {formatCurrency(item.unitPrice)}</span>
@@ -816,7 +826,7 @@ export default function NewSale({ setActiveTab }) {
                   <div key={item.productId} className={`cart-item-card ${item.isTintable ? 'tintable-item-card' : ''}`}>
                     <div className="cart-item-row">
                       <div className="cart-item-info">
-                        <span className="cart-item-name">{item.productName}</span>
+                        <span className="cart-item-name" title={item.productName}>{item.productName}</span>
                         <div className="cart-item-sub">
                           <span className="cart-item-size-badge">{item.size}</span>
                           <span className="cart-item-base-price">Base: {formatCurrency(item.unitPrice)}</span>

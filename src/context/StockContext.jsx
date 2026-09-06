@@ -733,6 +733,21 @@ export function StockProvider({ children }) {
     return withheldSales.filter(s => s.whtVoucherStatus === 'pending').length;
   }, [withheldSales]);
 
+  // Per-product items sold today calculation for Inventory overview
+  const getSoldToday = useCallback((productId) => {
+    let count = 0;
+    for (const s of todaySalesList) {
+      if (Array.isArray(s.items)) {
+        for (const item of s.items) {
+          if (item.productId === productId) {
+            count += Number(item.quantity) || 0;
+          }
+        }
+      }
+    }
+    return count;
+  }, [todaySalesList]);
+
   const lowStockProducts = products.filter(p => p.stock <= p.minStock);
 
   return (
@@ -759,6 +774,7 @@ export function StockProvider({ children }) {
         todayWithheldTax,
         todayItemsSold,
         todaySalesList,
+        getSoldToday,
         totalWithholdingCredits,
         pendingVouchersCount,
 

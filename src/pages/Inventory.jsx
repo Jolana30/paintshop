@@ -22,6 +22,8 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
     refreshData
   } = useStock();
 
+  const safeGetSoldToday = (id) => (typeof getSoldToday === 'function' ? getSoldToday(id) : 0);
+
   // Custom Local Product Modal State
   const [isAddCustomModalOpen, setIsAddCustomModalOpen] = useState(false);
   const [customName, setCustomName] = useState('');
@@ -148,10 +150,10 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
     if (interiorProducts.length > 0) {
       rows.push(["[ INTERIOR PAINTS ]", "", "", ""]);
       interiorProducts.forEach(p => {
-        rows.push([p.name, p.size, p.stock, getSoldToday(p.id)]);
+        rows.push([p.name, p.size, p.stock, safeGetSoldToday(p.id)]);
       });
       const intTotal = interiorProducts.reduce((sum, p) => sum + p.stock, 0);
-      const intSold = interiorProducts.reduce((sum, p) => sum + getSoldToday(p.id), 0);
+      const intSold = interiorProducts.reduce((sum, p) => sum + safeGetSoldToday(p.id), 0);
       rows.push(["Sub-total Interior", "", intTotal, intSold]);
       rows.push(["", "", "", ""]);
     }
@@ -160,10 +162,10 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
     if (exteriorProducts.length > 0) {
       rows.push(["[ EXTERIOR PAINTS ]", "", "", ""]);
       exteriorProducts.forEach(p => {
-        rows.push([p.name, p.size, p.stock, getSoldToday(p.id)]);
+        rows.push([p.name, p.size, p.stock, safeGetSoldToday(p.id)]);
       });
       const extTotal = exteriorProducts.reduce((sum, p) => sum + p.stock, 0);
-      const extSold = exteriorProducts.reduce((sum, p) => sum + getSoldToday(p.id), 0);
+      const extSold = exteriorProducts.reduce((sum, p) => sum + safeGetSoldToday(p.id), 0);
       rows.push(["Sub-total Exterior", "", extTotal, extSold]);
       rows.push(["", "", "", ""]);
     }
@@ -194,7 +196,7 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
         "", "", ""
       ]);
       interiorProducts.forEach(p => {
-        const sold = getSoldToday(p.id);
+        const sold = safeGetSoldToday(p.id);
         rows.push([
           `<strong>${p.name}</strong>`,
           p.size,
@@ -210,7 +212,7 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
         "", "", ""
       ]);
       exteriorProducts.forEach(p => {
-        const sold = getSoldToday(p.id);
+        const sold = safeGetSoldToday(p.id);
         rows.push([
           `<strong>${p.name}</strong>`,
           p.size,
@@ -478,7 +480,7 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
                   {filteredProducts.map(product => {
                     const isOut = product.stock === 0;
                     const isLow = product.stock <= product.minStock && !isOut;
-                    const soldToday = getSoldToday(product.id);
+                    const soldToday = safeGetSoldToday(product.id);
 
                     return (
                       <tr key={product.id} className={isOut ? 'row-out' : isLow ? 'row-low' : ''}>
@@ -551,7 +553,7 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
               {filteredProducts.map(product => {
                 const isOut = product.stock === 0;
                 const isLow = product.stock <= product.minStock && !isOut;
-                const soldToday = getSoldToday(product.id);
+                const soldToday = safeGetSoldToday(product.id);
 
                 return (
                   <div key={product.id} className={`mobile-product-card ${isOut ? 'card-out' : isLow ? 'card-low' : ''}`}>
