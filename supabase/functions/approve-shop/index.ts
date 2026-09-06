@@ -1,13 +1,31 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-key",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") ?? "";
+  const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+  ];
+
+  // Restrict CORS to local development, Vercel, or Netlify staging/production origins (P1)
+  const isAllowed =
+    allowedOrigins.includes(origin) ||
+    /^https:\/\/[a-z0-9-]+(\.netlify\.app|\.vercel\.app)$/i.test(origin);
+
+  return {
+    "Access-Control-Allow-Origin": isAllowed ? origin : allowedOrigins[0],
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -22,7 +40,6 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const expectedAdminKey = Deno.env.get("ADMIN_API_KEY") ?? "";
 
     if (!supabaseUrl || !serviceRoleKey) {
       console.error("Missing server configuration: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
@@ -32,44 +49,44 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 1. Authenticate the caller as an administrator
+    // 1. P1: Enforce JWT-only authentication (no browser-supplied static API keys)
     const authHeader = req.headers.get("Authorization");
-    const providedAdminKey = req.headers.get("x-admin-key");
-
-    let isAuthorizedAdmin = false;
-    let approverIdentifier = "admin_service";
-
-    // Option A: Admin API key header check
-    if (expectedAdminKey && providedAdminKey && providedAdminKey === expectedAdminKey) {
-      isAuthorizedAdmin = true;
-      approverIdentifier = "api_key_admin";
-    }
-
-    // Option B: JWT user with app_metadata.is_admin === true
-    if (!isAuthorizedAdmin && authHeader) {
-      const token = authHeader.replace("Bearer ", "").trim();
-      if (token) {
-        const authClient = createClient(supabaseUrl, serviceRoleKey);
-        const { data: { user }, error: userError } = await authClient.auth.getUser(token);
-
-        if (!userError && user) {
-          const isAdminClaim = Boolean(user.app_metadata?.is_admin);
-          if (isAdminClaim) {
-            isAuthorizedAdmin = true;
-            approverIdentifier = `user:${user.id}`;
-          }
-        }
-      }
-    }
-
-    if (!isAuthorizedAdmin) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(
-        JSON.stringify({ error: "Forbidden: Administrator access required" }),
+        JSON.stringify({ error: "Unauthorized: Missing or invalid Authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "").trim();
+    if (!token) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: Empty bearer token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate the token against Supabase Auth
+    const authClient = createClient(supabaseUrl, serviceRoleKey);
+    const { data: { user }, error: userError } = await authClient.auth.getUser(token);
+
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized: Invalid or expired session token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Verify caller has server-assigned administrator role in app_metadata
+    const isAdmin = Boolean(user.app_metadata?.is_admin);
+    if (!isAdmin) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden: Administrator privileges required" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // 2. Parse and validate payload
+    // 2. Parse and validate target shop ID payload
     const body = await req.json().catch(() => ({}));
     const shopId = body.shop_id || body.shopId;
 
@@ -81,13 +98,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 3. Execute admin_approve_shop via service_role client
+    // 3. P2: Pass true administrator UUID (user.id) to preserve in database audit trail
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false }
     });
 
     const { data, error } = await adminClient.rpc("admin_approve_shop", {
       target_shop_id: shopId,
+      p_approver_id: user.id
     });
 
     if (error) {
@@ -98,13 +116,13 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 4. Return clean approval result without leaking server credentials
+    // 4. Return clean approval result with true human approver ID
     return new Response(
       JSON.stringify({
         success: true,
         shop_id: shopId,
+        approver_id: user.id,
         status: "active",
-        approver: approverIdentifier,
         audit: data,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

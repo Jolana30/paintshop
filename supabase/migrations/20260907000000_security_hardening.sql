@@ -616,21 +616,28 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp;
 
--- 9. S-01: Hardened admin_approve_shop (Privileged role/claim verification & audit logging)
-CREATE OR REPLACE FUNCTION admin_approve_shop(target_shop_id UUID)
+-- 9. S-01 & P2: Hardened admin_approve_shop (Preserves true approver UUID in audit log)
+DROP FUNCTION IF EXISTS admin_approve_shop(UUID);
+CREATE OR REPLACE FUNCTION admin_approve_shop(
+    target_shop_id UUID,
+    p_approver_id UUID DEFAULT NULL
+)
 RETURNS JSONB AS $$
 DECLARE
     v_old_status TEXT;
     v_caller_role TEXT;
-    v_caller_id UUID;
+    v_approver_id UUID;
+    v_approver_role TEXT;
 BEGIN
-    -- S-01: Verify caller is service_role OR has is_admin = true claim
+    -- Verify caller is service_role OR has is_admin = true claim
     v_caller_role := auth.role();
-    v_caller_id := auth.uid();
-
     IF v_caller_role <> 'service_role' AND COALESCE((auth.jwt()->'app_metadata'->>'is_admin')::BOOLEAN, FALSE) IS NOT TRUE THEN
         RAISE EXCEPTION 'Access denied: caller does not have administrator privileges';
     END IF;
+
+    -- S-01 & P2: Record the validated human administrator's UUID if provided by admin service
+    v_approver_id := COALESCE(p_approver_id, auth.uid());
+    v_approver_role := CASE WHEN p_approver_id IS NOT NULL THEN 'admin_user' ELSE COALESCE(v_caller_role, 'service_role') END;
 
     SELECT status INTO v_old_status
     FROM shops
@@ -645,7 +652,7 @@ BEGIN
         updated_at = NOW()
     WHERE id = target_shop_id;
 
-    -- Record immutable audit log
+    -- Record immutable audit log with the true administrator's ID
     INSERT INTO shop_approval_audit (
         target_shop_id,
         approver_id,
@@ -655,8 +662,8 @@ BEGIN
         created_at
     ) VALUES (
         target_shop_id,
-        v_caller_id,
-        COALESCE(v_caller_role, 'service_role'),
+        v_approver_id,
+        v_approver_role,
         v_old_status,
         'active',
         NOW()
@@ -665,6 +672,7 @@ BEGIN
     RETURN jsonb_build_object(
         'success', true,
         'shop_id', target_shop_id,
+        'approver_id', v_approver_id,
         'old_status', v_old_status,
         'new_status', 'active'
     );
@@ -675,7 +683,7 @@ SET search_path = public, pg_temp;
 -- 10. S-04: Enforce Least-Privilege Execution Grants
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon;
-REVOKE EXECUTE ON FUNCTION admin_approve_shop(UUID) FROM authenticated;
+REVOKE ALL ON FUNCTION admin_approve_shop(UUID, UUID) FROM PUBLIC, anon, authenticated;
 
 -- Grant tenant RPCs only to authenticated users
 GRANT EXECUTE ON FUNCTION is_active_shop() TO authenticated;
@@ -686,7 +694,7 @@ GRANT EXECUTE ON FUNCTION add_custom_product_transaction(TEXT, TEXT, TEXT, TEXT,
 GRANT EXECUTE ON FUNCTION update_wht_voucher_transaction(TEXT, TEXT, TEXT) TO authenticated;
 
 -- S-01: Grant admin_approve_shop ONLY to service_role (not accessible via tenant JWTs)
-GRANT EXECUTE ON FUNCTION admin_approve_shop(UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION admin_approve_shop(UUID, UUID) TO service_role;
 
 -- 11. S-03: Add database check constraints for non-negative values
 DO $$

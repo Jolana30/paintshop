@@ -324,26 +324,24 @@ export const supabaseApi = {
   },
 
   /**
-   * Super Admin approval service (P1): Calls the secure backend Edge Function endpoint
-   * using admin credentials (JWT with admin claim or admin key).
+   * Super Admin approval service (P1 & P2): Calls the secure backend Edge Function endpoint
+   * using an authenticated administrator session JWT. The administrator's user.id is permanently
+   * recorded in the database audit log.
    */
-  async approveShopViaAdminService(shopId, { adminToken, adminKey } = {}) {
+  async approveShopViaAdminService(shopId, adminToken) {
     if (!isSupabaseConfigured) return { success: true, shop_id: shopId, status: 'active' };
 
-    const headers = {
-      'Content-Type': 'application/json',
-      apikey: SUPABASE_ANON_KEY
-    };
-    if (adminToken) {
-      headers['Authorization'] = `Bearer ${adminToken}`;
-    }
-    if (adminKey) {
-      headers['x-admin-key'] = adminKey;
+    if (!adminToken) {
+      throw new Error('Administrator session token is required to approve branches.');
     }
 
     const res = await fetch(`${SUPABASE_URL}/functions/v1/approve-shop`, {
       method: 'POST',
-      headers,
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${adminToken}`
+      },
       body: JSON.stringify({ shop_id: shopId })
     });
 

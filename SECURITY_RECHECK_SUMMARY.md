@@ -151,3 +151,34 @@ Static review cannot prove runtime RLS behavior. After applying the corrected mi
 ## Bottom line
 
 The application is much safer than at the first review: its core sales and stock operations are now transactional, server-calculated, and protected from direct tenant writes. The remaining production blocker is migration safety: make sure the old permissive `shops` policy is actually removed in existing databases. Then add a real server-side administrator approval path and complete live RLS tests.
+
+---
+
+## Latest recheck — 2026-09-07
+
+### Confirmed closed
+
+- The hardening migration now drops `shop_isolation_profile` and related legacy `shops` policies before installing the replacement policies. This closes the previously reported migration self-approval bypass.
+- The clean schema and migration both retain SELECT-only tenant policies for stock, sales, sale items, and movements. An active tenant cannot directly PATCH its stock through PostgREST; it must use the approved RPC path.
+- Every current `SECURITY DEFINER` function, including provisioning triggers, now fixes `search_path` to `public, pg_temp`.
+- Hosting configuration now includes CSP, HSTS, MIME-sniffing, referrer, frame, and permissions-policy headers for both Netlify and Vercel.
+- A server-side `approve-shop` Edge Function has been added. It uses the service-role credential kept in Edge Function environment variables and validates an `app_metadata.is_admin` JWT claim.
+- Lint, production build, and production dependency audit all pass.
+
+### Remaining hardening items
+
+#### P1 — Avoid browser-supplied static administrator keys
+
+The Edge Function supports `x-admin-key` as an alternative to an administrator JWT, and its CORS policy allows every origin. The current frontend helper also accepts an `adminKey` argument and sends it from a browser. A static approval secret used in a browser can be exposed through browser storage, source code, extensions, logs, or XSS; broad CORS makes it usable from any origin once exposed.
+
+**Recommendation:** remove the `x-admin-key` option and its frontend parameter. Use only a validated administrator JWT whose `app_metadata.is_admin` claim is set server-side. Restrict `Access-Control-Allow-Origin` to the known production and staging origins.
+
+#### P2 — Preserve the true approver in database audit data
+
+The Edge Function validates an admin user then invokes the SQL RPC using a service-role client. Inside the SQL RPC, `auth.uid()` represents the service context rather than the validated administrator, so the database audit row can record a null/service approver instead of the real administrator.
+
+**Recommendation:** have the Edge Function write the audit entry itself after successful approval, or pass a validated approver UUID into a server-only function and validate that UUID before inserting it. Do not accept an approver ID from ordinary browser input.
+
+#### P2 — Live RLS verification is still required
+
+This recheck verified code and configuration statically. It cannot prove the deployed Supabase project has received the migration or that its live grants/policies have no manual drift. Run the existing live test matrix against a staging project before production deployment.
