@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useStock } from '../context/StockContext';
 import {
   BarChart3Icon,
@@ -11,13 +11,9 @@ import { printOrSaveAsPdf } from '../utils/exportPdf';
 export default function Reports() {
   const {
     products,
-    sales,
     withheldSales,
     movements,
-    lowStockProducts,
     todayRevenue,
-    todayNetRevenue,
-    todayWithheldTax,
     todayItemsSold,
     totalWithholdingCredits,
     pendingVouchersCount,

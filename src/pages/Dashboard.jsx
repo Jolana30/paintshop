@@ -1,5 +1,5 @@
-import React from 'react';
-import { useStock, getLocalDateString } from '../context/StockContext';
+import { useStock } from '../context/StockContext';
+import { getLocalDateString } from '../utils/formatters';
 import {
   ShoppingCartIcon,
   ArrowDownToDotIcon,

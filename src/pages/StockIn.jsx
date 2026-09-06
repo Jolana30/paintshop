@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useStock } from '../context/StockContext';
 import {
   ArrowDownToDotIcon,
   CheckCircleIcon,
   SearchIcon,
-  PlusIcon,
   PackageIcon
 } from '../components/Icons';
 
@@ -16,11 +15,13 @@ export default function StockIn({ preselectedProductId, setActiveTab }) {
   const [reference, setReference] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
+  const [prevPreselectedId, setPrevPreselectedId] = useState(preselectedProductId);
+  if (preselectedProductId !== prevPreselectedId) {
+    setPrevPreselectedId(preselectedProductId);
     if (preselectedProductId) {
       setSelectedProductId(preselectedProductId);
     }
-  }, [preselectedProductId]);
+  }
 
   const selectedProduct = products.find(p => p.id === selectedProductId) || products[0];
 

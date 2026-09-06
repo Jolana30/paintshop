@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useStock } from '../context/StockContext';
+import { isSupabaseConfigured } from '../lib/supabaseClient';
 import {
   PaintBucketIcon,
-  CheckCircleIcon,
-  AlertTriangleIcon
+  CheckCircleIcon
 } from '../components/Icons';
 
 export default function AuthPage() {
@@ -179,25 +179,41 @@ export default function AuthPage() {
             To ensure authorized dealer compliance, our SaaS administrator verifies every paint retailer branch before unlocking the live POS and stock registers.
           </p>
 
-          {/* Quick Demo Action for Testing / Local Environment */}
-          <div className="admin-demo-approval-action">
-            <button
-              type="button"
-              className="btn-admin-approve"
-              onClick={() => approveShop(currentShop.id)}
-            >
-              <CheckCircleIcon size={16} />
-              <span>[Demo Admin Action] Approve & Unlock Store Now</span>
-            </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              style={{ marginTop: '0.75rem', width: '100%', display: 'flex', justifyContent: 'center' }}
-              onClick={logoutShop}
-            >
-              Sign Out / Switch Branch
-            </button>
-          </div>
+          {/* Quick Demo Action for Testing / Local Environment only (S-06) */}
+          {!isSupabaseConfigured ? (
+            <div className="admin-demo-approval-action">
+              <button
+                type="button"
+                className="btn-admin-approve"
+                onClick={() => approveShop(currentShop.id)}
+              >
+                <CheckCircleIcon size={16} />
+                <span>[Demo Admin Action] Approve & Unlock Store Now</span>
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ marginTop: '0.75rem', width: '100%', display: 'flex', justifyContent: 'center' }}
+                onClick={logoutShop}
+              >
+                Sign Out / Switch Branch
+              </button>
+            </div>
+          ) : (
+            <div className="admin-demo-approval-action" style={{ textAlign: 'center' }}>
+              <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '1rem', lineHeight: '1.4' }}>
+                Your branch registration is under review by the PaintFlow administration team. Once verified, access to inventory and POS will be granted.
+              </p>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
+                onClick={logoutShop}
+              >
+                Sign Out / Switch Branch
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -256,26 +272,28 @@ export default function AuthPage() {
             </div>
           </div>
 
-          {/* Quick Demo Login Preset Buttons */}
-          <div className="demo-shops-box">
-            <span className="demo-box-label">🚀 Instant Test Shops (Click to explore):</span>
-            <div className="demo-buttons-group">
-              <button
-                type="button"
-                className="btn-demo-preset"
-                onClick={() => handleQuickDemoLogin('bole')}
-              >
-                🏢 Shop 1: Jotun Bole Center
-              </button>
-              <button
-                type="button"
-                className="btn-demo-preset"
-                onClick={() => handleQuickDemoLogin('merkato')}
-              >
-                🏬 Shop 2: Merkato Colors
-              </button>
+          {/* Quick Demo Login Preset Buttons (Local / Demo environment only, S-06) */}
+          {!isSupabaseConfigured && (
+            <div className="demo-shops-box">
+              <span className="demo-box-label">🚀 Instant Test Shops (Demo Mode):</span>
+              <div className="demo-buttons-group">
+                <button
+                  type="button"
+                  className="btn-demo-preset"
+                  onClick={() => handleQuickDemoLogin('bole')}
+                >
+                  🏢 Shop 1: Jotun Bole Center
+                </button>
+                <button
+                  type="button"
+                  className="btn-demo-preset"
+                  onClick={() => handleQuickDemoLogin('merkato')}
+                >
+                  🏬 Shop 2: Merkato Colors
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Right Form Panel */}

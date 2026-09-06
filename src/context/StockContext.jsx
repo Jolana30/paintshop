@@ -1,35 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { initialProducts, initialSales, initialMovements } from '../data/initialProducts';
 import { supabaseApi, supabaseAuth, isSupabaseConfigured } from '../lib/supabaseClient';
+import { formatCurrency, getLocalDateString, generateUUID } from '../utils/formatters';
 
 const StockContext = createContext(null);
-
-// Format currency in Ethiopian Birr (ETB)
-export const formatCurrency = (amount) => {
-  const num = Number(amount) || 0;
-  return `${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ETB`;
-};
-
-// Helper for local date YYYY-MM-DD
-export const getLocalDateString = (d = new Date()) => {
-  const date = new Date(d);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-// Robust collision-proof UUID generator
-export const generateUUID = () => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-};
 
 // Pre-seeded Demo Shops for immediate evaluation
 const DEFAULT_DEMO_SHOPS = [
@@ -56,14 +30,14 @@ const DEFAULT_DEMO_SHOPS = [
 ];
 
 export function StockProvider({ children }) {
-  const [cloudStatus, setCloudStatus] = useState(isSupabaseConfigured ? 'connected' : 'offline');
+  const [cloudStatus, setCloudStatus] = useState(isSupabaseConfigured ? 'checking' : 'offline');
   const [toast, setToast] = useState(null);
   const [authError, setAuthError] = useState(null);
 
   // 1. Multi-Shop Registry & Active Session
   const [allShops, setAllShops] = useState(() => {
     const saved = localStorage.getItem('paintflow_all_shops');
-    return saved ? JSON.parse(saved) : DEFAULT_DEMO_SHOPS;
+    return saved ? JSON.parse(saved) : (isSupabaseConfigured ? [] : DEFAULT_DEMO_SHOPS);
   });
 
   const [currentShop, setCurrentShop] = useState(() => {
@@ -71,8 +45,8 @@ export function StockProvider({ children }) {
     if (saved) {
       try { return JSON.parse(saved); } catch { /* ignore */ }
     }
-    // Default to first demo shop in offline mode
-    return DEFAULT_DEMO_SHOPS[0];
+    // S-06: In cloud mode, require explicit authentication. In offline mode, default to demo shop.
+    return isSupabaseConfigured ? null : DEFAULT_DEMO_SHOPS[0];
   });
 
   useEffect(() => {
@@ -107,18 +81,157 @@ export function StockProvider({ children }) {
     return saved ? JSON.parse(saved) : initialMovements;
   });
 
+  const showToast = useCallback((message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 4000);
+  }, []);
+
+  // S-05: Authoritative Cloud Data Hydration
+  const hydrateCloudData = useCallback(async (shop) => {
+    if (!isSupabaseConfigured || !shop?.id || shop.status !== 'active') return;
+
+    try {
+      await Promise.resolve();
+      setCloudStatus('connecting');
+      const [masterRes, invRes, salesRes, movRes] = await Promise.all([
+        supabaseApi.getMasterProducts(),
+        supabaseApi.getShopInventory(shop.id),
+        supabaseApi.getSales(shop.id),
+        supabaseApi.getMovements(shop.id)
+      ]);
+
+      const masterList = Array.isArray(masterRes) ? masterRes : [];
+      const invList = Array.isArray(invRes) ? invRes : [];
+
+      const invByMasterId = new Map();
+      const customItems = [];
+
+      for (const inv of invList) {
+        if (inv.master_product_id) {
+          invByMasterId.set(inv.master_product_id, inv);
+        } else if (inv.is_custom) {
+          customItems.push({
+            id: inv.id,
+            code: inv.custom_code || 'CUSTOM',
+            name: inv.custom_name,
+            category: inv.custom_category || 'Accessories',
+            size: inv.custom_size || '1 Unit',
+            priceBeforeVat: Number(inv.custom_price_before_vat) || 0,
+            priceWithVat: Number(inv.custom_price_with_vat) || 0,
+            stock: Number(inv.stock) || 0,
+            minStock: Number(inv.min_stock) || 5,
+            isCustom: true
+          });
+        }
+      }
+
+      const combinedMasterProducts = masterList.map(mp => {
+        const invRow = invByMasterId.get(mp.id);
+        return {
+          id: mp.id,
+          code: mp.code,
+          name: mp.name,
+          category: mp.category,
+          size: mp.size,
+          priceBeforeVat: Number(mp.price_before_vat) || 0,
+          priceWithVat: Number(mp.price_with_vat) || 0,
+          minStock: invRow ? Number(invRow.min_stock) : (Number(mp.min_stock) || 5),
+          stock: invRow ? Number(invRow.stock) : 0,
+          isCustom: false
+        };
+      });
+
+      const fullProductCatalog = [...combinedMasterProducts, ...customItems];
+      setProducts(fullProductCatalog);
+
+      if (Array.isArray(salesRes)) {
+        const mappedSales = salesRes.map(s => ({
+          id: s.id,
+          timestamp: s.created_at,
+          localDate: getLocalDateString(s.created_at),
+          items: Array.isArray(s.sale_items) ? s.sale_items.map(si => ({
+            productId: si.product_id,
+            productName: si.product_name,
+            code: si.code,
+            size: si.size,
+            quantity: si.quantity,
+            unitPrice: Number(si.unit_price),
+            priceBeforeVat: Number(si.price_before_vat),
+            subtotal: Number(si.subtotal)
+          })) : [],
+          totalItems: s.total_items,
+          total: Number(s.total),
+          grossTotal: Number(s.total),
+          isWithholding: Boolean(s.is_withholding),
+          withholdingRate: Number(s.withholding_rate),
+          withholdingAmount: Number(s.withholding_amount),
+          netPayable: Number(s.net_payable),
+          customer: s.customer,
+          customerTin: s.customer_tin,
+          whtVoucherNumber: s.wht_voucher_number,
+          whtVoucherStatus: s.wht_voucher_status,
+          paymentType: s.payment_type,
+          shopId: s.shop_id,
+          shopName: shop.name
+        }));
+        setSales(mappedSales);
+      }
+
+      if (Array.isArray(movRes)) {
+        const mappedMovs = movRes.map(m => ({
+          id: m.id,
+          productId: m.product_id,
+          productName: m.product_name,
+          type: m.type,
+          quantity: m.quantity,
+          previousStock: m.previous_stock,
+          newStock: m.new_stock,
+          reference: m.reference,
+          timestamp: m.created_at
+        }));
+        setMovements(mappedMovs);
+      }
+
+      setCloudStatus('connected');
+    } catch (err) {
+      console.error('[Cloud Hydration Error]', err);
+      setCloudStatus('error');
+      showToast(`Warning: Could not load cloud records: ${err.message}`, 'error');
+    }
+  }, [showToast]);
+
   // Reload products/sales whenever the active shop changes
   useEffect(() => {
     if (!currentShop) return;
-    const savedProds = localStorage.getItem(`paintflow_products_${currentShop.id}`);
-    setProducts(savedProds ? JSON.parse(savedProds) : initialProducts);
+    let isCancelled = false;
 
-    const savedSales = localStorage.getItem(`paintflow_sales_${currentShop.id}`);
-    setSales(savedSales ? JSON.parse(savedSales) : initialSales);
+    const loadShopData = async () => {
+      await Promise.resolve();
+      if (isCancelled) return;
 
-    const savedMovs = localStorage.getItem(`paintflow_movements_${currentShop.id}`);
-    setMovements(savedMovs ? JSON.parse(savedMovs) : initialMovements);
-  }, [currentShop?.id]);
+      if (isSupabaseConfigured && currentShop.status === 'active') {
+        await hydrateCloudData(currentShop);
+      } else {
+        const savedProds = localStorage.getItem(`paintflow_products_${currentShop.id}`);
+        setProducts(savedProds ? JSON.parse(savedProds) : initialProducts);
+
+        const savedSales = localStorage.getItem(`paintflow_sales_${currentShop.id}`);
+        setSales(savedSales ? JSON.parse(savedSales) : initialSales);
+
+        const savedMovs = localStorage.getItem(`paintflow_movements_${currentShop.id}`);
+        setMovements(savedMovs ? JSON.parse(savedMovs) : initialMovements);
+        setCloudStatus(isSupabaseConfigured ? 'connected' : 'offline');
+      }
+    };
+
+    loadShopData();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentShop, hydrateCloudData]);
 
   // Sync to local storage per-shop
   useEffect(() => {
@@ -138,13 +251,6 @@ export function StockProvider({ children }) {
       localStorage.setItem(`paintflow_movements_${currentShop.id}`, JSON.stringify(movements));
     }
   }, [movements, currentShop?.id]);
-
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => {
-      setToast(null);
-    }, 4000);
-  };
 
   // 5. Authentication Handlers
   const loginShop = async (email, password, mockShopOverride = null) => {
@@ -419,13 +525,20 @@ export function StockProvider({ children }) {
       shopName: currentShop?.name
     };
 
-    // Execute Atomic Database Transaction via Supabase RPC
+    // Execute Atomic Database Transaction via Supabase RPC (S-03)
     if (isSupabaseConfigured && currentShop?.id) {
       try {
-        await supabaseApi.recordSale({
+        const serverRes = await supabaseApi.recordSale({
           sale: newSale,
           items: cartItems
         });
+        if (serverRes?.gross_total !== undefined) {
+          newSale.grossTotal = Number(serverRes.gross_total);
+          newSale.total = newSale.grossTotal;
+          newSale.totalItems = Number(serverRes.total_items);
+          newSale.withholdingAmount = Number(serverRes.withholding_amount);
+          newSale.netPayable = Number(serverRes.net_payable);
+        }
       } catch (err) {
         console.error('[Sale Transaction Failed]', err);
         showToast(`Transaction failed: ${err.message}`, 'error');
@@ -584,7 +697,12 @@ export function StockProvider({ children }) {
   };
 
   const refreshData = async () => {
-    showToast("Catalog and sales up to date!", "success");
+    if (isSupabaseConfigured && currentShop?.status === 'active') {
+      await hydrateCloudData(currentShop);
+      showToast("Cloud catalog and sales synchronized!", "success");
+    } else {
+      showToast("Catalog and sales up to date!", "success");
+    }
   };
 
   // Financial & Withholding Metrics

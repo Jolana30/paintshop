@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useStock } from '../context/StockContext';
 import {
   SearchIcon,
@@ -19,8 +19,6 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
     todayItemsSold,
     getSoldToday,
     processStockAdjustment,
-    lowStockProducts,
-    formatCurrency,
     refreshData
   } = useStock();
 

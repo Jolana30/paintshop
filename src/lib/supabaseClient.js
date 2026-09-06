@@ -211,25 +211,19 @@ export const supabaseApi = {
   },
 
   /**
-   * Add a custom local product (brushes, rollers, local putty)
+   * Add a custom local product via transactional RPC (S-02)
    */
-  async addCustomProduct(shopId, product) {
+  async addCustomProduct(_shopId, product) {
     if (!isSupabaseConfigured) return null;
-    return fetchFromSupabase('shop_inventory', {
-      method: 'POST',
-      body: JSON.stringify({
-        shop_id: shopId,
-        master_product_id: null,
-        is_custom: true,
-        custom_name: product.name,
-        custom_category: product.category || 'Accessories',
-        custom_size: product.size || '1 Unit',
-        custom_code: product.code || ('CUSTOM-' + Date.now().toString().slice(-6)),
-        custom_price_before_vat: product.priceBeforeVat || 0,
-        custom_price_with_vat: product.priceWithVat,
-        stock: product.stock || 0,
-        min_stock: product.minStock || 5
-      })
+    return callRpc('add_custom_product_transaction', {
+      p_name: product.name,
+      p_category: product.category || 'Accessories',
+      p_size: product.size || '1 Unit',
+      p_code: product.code || null,
+      p_price_before_vat: product.priceBeforeVat || null,
+      p_price_with_vat: product.priceWithVat,
+      p_stock: product.stock || 0,
+      p_min_stock: product.minStock || 5
     });
   },
 
@@ -301,15 +295,14 @@ export const supabaseApi = {
   },
 
   /**
-   * Update Withholding Tax Voucher number & status for a sale
+   * Update Withholding Tax Voucher number & status for a sale via transactional RPC (S-02)
    */
   async updateSaleWhtVoucher(saleId, { voucherNumber, voucherStatus }) {
-    return fetchFromSupabase(`sales?id=eq.${encodeURIComponent(saleId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        wht_voucher_number: voucherNumber,
-        wht_voucher_status: voucherStatus
-      })
+    if (!isSupabaseConfigured) return true;
+    return callRpc('update_wht_voucher_transaction', {
+      p_sale_id: saleId,
+      p_voucher_number: voucherNumber || '',
+      p_voucher_status: voucherStatus || 'pending'
     });
   },
 

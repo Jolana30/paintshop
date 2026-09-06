@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useStock } from '../context/StockContext';
 import {
   ReceiptTextIcon,
@@ -9,7 +9,7 @@ import { downloadExcelCsv } from '../utils/exportExcel';
 import { printOrSaveAsPdf } from '../utils/exportPdf';
 
 export default function Sales({ setActiveTab, initialDate = '', onClearDateFilter }) {
-  const { sales, formatCurrency, currentShop, updateSaleWhtVoucher } = useStock();
+  const { sales, formatCurrency, updateSaleWhtVoucher } = useStock();
   const [editingVoucherSale, setEditingVoucherSale] = useState(null);
   const [inputVoucherNo, setInputVoucherNo] = useState('');
   const [inputVoucherStatus, setInputVoucherStatus] = useState('received');
@@ -27,7 +27,8 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
   }, []);
 
   const yesterdayStr = useMemo(() => {
-    const d = new Date(Date.now() - 86400000);
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -56,12 +57,14 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
   const [showDetails, setShowDetails] = useState(false);
 
   // Sync initialDate when navigating from dashboard
-  useEffect(() => {
+  const [prevInitialDate, setPrevInitialDate] = useState(initialDate);
+  if (initialDate !== prevInitialDate) {
+    setPrevInitialDate(initialDate);
     if (initialDate) {
       setFilterMode('DAY');
       setSelectedDate(initialDate);
     }
-  }, [initialDate]);
+  }
 
   // Check if non-default filters are active (to highlight the details button)
   const hasActiveAdvancedFilters = filterMode !== 'DAY' || selectedDate !== todayStr || selectedPayment !== 'ALL';
@@ -488,9 +491,9 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredSales.map((sale, index) => {
+                  {filteredSales.map((sale) => {
                     const dt = new Date(sale.timestamp);
-                    const isRecent = index === 0 && (Date.now() - dt.getTime() < 1000 * 60 * 10);
+                    const isRecent = Boolean(sale.isRecent);
                     const payType = sale.paymentType || sale.customer || 'Cash';
                     return (
                       <tr key={sale.id} className={isRecent ? 'row-recently-recorded' : ''}>
@@ -581,9 +584,9 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
 
             {/* Mobile Native Transaction Cards */}
             <div className="mobile-only-cards">
-              {filteredSales.map((sale, index) => {
+              {filteredSales.map((sale) => {
                 const dt = new Date(sale.timestamp);
-                const isRecent = index === 0 && (Date.now() - dt.getTime() < 1000 * 60 * 10);
+                const isRecent = Boolean(sale.isRecent);
                 return (
                   <div key={sale.id} className={`mobile-sale-card ${isRecent ? 'card-recently-recorded' : ''}`}>
                     <div className="msc-header">

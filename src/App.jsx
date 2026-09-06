@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { StockProvider, useStock } from './context/StockContext';
 import Navigation from './components/Navigation';
 import AuthPage from './pages/AuthPage';
