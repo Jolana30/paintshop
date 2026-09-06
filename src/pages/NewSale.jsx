@@ -19,6 +19,13 @@ export default function NewSale({ setActiveTab }) {
   const [paymentType, setPaymentType] = useState('Cash'); // 'Cash', 'CBE', 'Sinke', 'Coop', 'Awash', 'Dashen'
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
+  // Ethiopian 3% Withholding Tax (WHT) State
+  const [isWithholding, setIsWithholding] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [customerTin, setCustomerTin] = useState('');
+  const [whtVoucherNumber, setWhtVoucherNumber] = useState('');
+  const [whtVoucherStatus, setWhtVoucherStatus] = useState('pending'); // 'received' | 'pending'
+
   // Extract unique categories
   const categories = useMemo(() => {
     return ['ALL', ...Array.from(new Set(products.map(p => p.category)))];
@@ -201,6 +208,11 @@ export default function NewSale({ setActiveTab }) {
   const cartSubtotalBeforeVat = cartBaseBeforeVat + cartColorantBeforeVat;
   const cartVatTotal = cartTotal - cartSubtotalBeforeVat;
 
+  // Ethiopian 3% Withholding Tax Calculation
+  const cartGrossTotal = cartTotal;
+  const cartWhtAmount = isWithholding ? Math.round((cartGrossTotal * 0.03) * 100) / 100 : 0;
+  const cartNetPayable = isWithholding ? (cartGrossTotal - cartWhtAmount) : cartGrossTotal;
+
   // Record Sale and immediately show it in Sales History
   const handleRecordSale = (e) => {
     if (e) e.preventDefault();
@@ -209,12 +221,26 @@ export default function NewSale({ setActiveTab }) {
       return;
     }
 
-    const completed = processSale(cart, paymentType);
+    const completed = processSale(cart, paymentType, {
+      isWithholding,
+      withholdingRate: 3.0,
+      withholdingAmount: cartWhtAmount,
+      netPayable: cartNetPayable,
+      customerName: customerName.trim() || (isWithholding ? 'Corporate Contractor' : 'Cash Walk-in'),
+      customerTin: customerTin.trim(),
+      whtVoucherNumber: whtVoucherNumber.trim(),
+      whtVoucherStatus: isWithholding ? whtVoucherStatus : 'not_applicable'
+    });
+
     if (completed) {
       setCart([]);
       setPaymentType('Cash');
+      setIsWithholding(false);
+      setCustomerName('');
+      setCustomerTin('');
+      setWhtVoucherNumber('');
+      setWhtVoucherStatus('pending');
       setIsMobileCartOpen(false);
-      // Navigate directly to Sales History so user immediately sees their recorded transaction
       setActiveTab('sales');
     }
   };
@@ -315,7 +341,10 @@ export default function NewSale({ setActiveTab }) {
                     className={`product-card ${isOutOfStock ? 'disabled-card' : ''} ${inCartItem ? 'selected-card' : ''}`}
                   >
                     <div className="product-card-top">
-                      <span className="product-card-category">{p.category}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span className="product-card-category">{p.category}</span>
+                        {p.isCustom && <span className="badge-pill badge-warning" style={{ fontSize: '9px', padding: '1px 5px' }}>Custom</span>}
+                      </div>
                       <span className="badge-tag">{p.size}</span>
                     </div>
 
@@ -530,9 +559,85 @@ export default function NewSale({ setActiveTab }) {
                   </div>
                 </div>
 
+                {/* Ethiopian 3% Withholding Tax (WHT) Section */}
+                <div className="wht-checkout-box mb-3">
+                  <div className="wht-toggle-header">
+                    <label className="wht-checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={isWithholding}
+                        onChange={(e) => setIsWithholding(e.target.checked)}
+                      />
+                      <span className="wht-toggle-title">Apply 3% Withholding Tax (WHT)</span>
+                    </label>
+                    {cartGrossTotal >= 20000 && !isWithholding && (
+                      <span className="badge-wht-hint">💡 Over 20k ETB (Eligible for 3% WHT)</span>
+                    )}
+                  </div>
+
+                  {isWithholding && (
+                    <div className="wht-fields-container">
+                      <div className="form-group mb-2">
+                        <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Client / Company Name *</label>
+                        <input
+                          type="text"
+                          required={isWithholding}
+                          placeholder="e.g. Sunshine Construction PLC"
+                          value={customerName}
+                          onChange={(e) => setCustomerName(e.target.value)}
+                          className="form-input form-input-sm"
+                        />
+                      </div>
+
+                      <div className="form-grid-2 mb-2">
+                        <div>
+                          <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Customer TIN (10-digits)</label>
+                          <input
+                            type="text"
+                            placeholder="0012345678"
+                            value={customerTin}
+                            onChange={(e) => setCustomerTin(e.target.value)}
+                            className="form-input form-input-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>WHT Voucher Serial #</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. WHT-9481"
+                            value={whtVoucherNumber}
+                            onChange={(e) => setWhtVoucherNumber(e.target.value)}
+                            className="form-input form-input-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="wht-status-pill-group">
+                        <span className="text-xs text-muted">Voucher Status:</span>
+                        <div className="pill-options">
+                          <button
+                            type="button"
+                            className={`wht-status-chip ${whtVoucherStatus === 'received' ? 'active-success' : ''}`}
+                            onClick={() => setWhtVoucherStatus('received')}
+                          >
+                            ✓ Voucher In Hand
+                          </button>
+                          <button
+                            type="button"
+                            className={`wht-status-chip ${whtVoucherStatus === 'pending' ? 'active-warning' : ''}`}
+                            onClick={() => setWhtVoucherStatus('pending')}
+                          >
+                            ⏳ Pending Collection
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="cart-financials">
                   <div className="financial-row">
-                    <span>Base Paint ({cartItemCount} items)</span>
+                    <span>Base Goods ({cartItemCount} items)</span>
                     <span>{formatCurrency(cartBaseBeforeVat)}</span>
                   </div>
                   {cartColorantBeforeVat > 0 && (
@@ -545,9 +650,21 @@ export default function NewSale({ setActiveTab }) {
                     <span>VAT (15%)</span>
                     <span>{formatCurrency(cartVatTotal)}</span>
                   </div>
+                  <div className="financial-row">
+                    <span>Gross Invoice Total</span>
+                    <span>{formatCurrency(cartGrossTotal)}</span>
+                  </div>
+
+                  {isWithholding && (
+                    <div className="financial-row text-danger font-semibold" style={{ color: '#dc2626' }}>
+                      <span>Less: 3% Withholding Tax (WHT)</span>
+                      <span>- {formatCurrency(cartWhtAmount)}</span>
+                    </div>
+                  )}
+
                   <div className="financial-row financial-total">
-                    <span>Total Due (ETB)</span>
-                    <span>{formatCurrency(cartTotal)}</span>
+                    <span>{isWithholding ? 'Net Cash to Collect (ETB)' : 'Total Due (ETB)'}</span>
+                    <span>{formatCurrency(cartNetPayable)}</span>
                   </div>
                 </div>
 
@@ -556,7 +673,10 @@ export default function NewSale({ setActiveTab }) {
                   className="btn-complete-sale"
                 >
                   <CheckCircleIcon size={20} />
-                  Record Sale & Deduct Stock ({formatCurrency(cartTotal)})
+                  {isWithholding 
+                    ? `Record Sale (Collect ${formatCurrency(cartNetPayable)} Net)`
+                    : `Record Sale & Deduct Stock (${formatCurrency(cartGrossTotal)})`
+                  }
                 </button>
                 <p className="text-xs text-muted text-center mt-2">
                   ✓ Automatically deducts stock and switches directly to Sales History

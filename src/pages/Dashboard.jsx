@@ -27,7 +27,7 @@ export default function Dashboard({ setActiveTab, onSelectStockInProduct, onView
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Jotun Paint Manager</h1>
+          <h1 className="page-title">PaintFlow</h1>
           <p className="page-subtitle">Real-time stock control & sales dashboard (Birr / ETB)</p>
         </div>
         <div className="header-meta">
@@ -39,22 +39,14 @@ export default function Dashboard({ setActiveTab, onSelectStockInProduct, onView
 
       {/* Metric Cards */}
       <div className="stats-grid">
-        <div
-          className="stat-card stat-card-clickable"
-          onClick={handleOpenTodaySales}
-          style={{ cursor: 'pointer' }}
-          title="Click to view today's sales breakdown"
-        >
+        <div className="stat-card">
           <div className="stat-icon-wrap bg-blue-subtle text-primary">
             <ReceiptTextIcon size={22} />
           </div>
           <div className="stat-content">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="stat-label">Today's Sales</span>
-              <span className="badge-pill badge-primary" style={{ fontSize: '10px' }}>View Sales ➔</span>
-            </div>
+            <span className="stat-label">Today's Sales</span>
             <span className="stat-value">{formatCurrency(todayRevenue)}</span>
-            <span className="stat-subtext">Click to view daily transactions</span>
+            <span className="stat-subtext">Total daily gross revenue in ETB</span>
           </div>
         </div>
 
@@ -62,18 +54,18 @@ export default function Dashboard({ setActiveTab, onSelectStockInProduct, onView
           className="stat-card stat-card-clickable"
           onClick={handleOpenTodaySales}
           style={{ cursor: 'pointer' }}
-          title="Click to view detailed items sold today"
+          title="Click to view detailed items sold today in Sales History"
         >
           <div className="stat-icon-wrap bg-emerald-subtle text-success">
             <ShoppingCartIcon size={22} />
           </div>
           <div className="stat-content">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="stat-header-row">
               <span className="stat-label">Units Sold Today</span>
-              <span className="badge-pill badge-healthy" style={{ fontSize: '10px' }}>View Details ➔</span>
+              <span className="stat-action-badge">View Details ➔</span>
             </div>
             <span className="stat-value">{todayItemsSold}</span>
-            <span className="stat-subtext">Click to see what was sold today</span>
+            <span className="stat-subtext">Tap to view itemized daily sales</span>
           </div>
         </div>
 

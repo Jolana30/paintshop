@@ -15,6 +15,7 @@ import { printOrSaveAsPdf } from '../utils/exportPdf';
 export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
   const {
     products,
+    addCustomProduct,
     todayItemsSold,
     getSoldToday,
     processStockAdjustment,
@@ -22,6 +23,35 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
     formatCurrency,
     refreshData
   } = useStock();
+
+  // Custom Local Product Modal State
+  const [isAddCustomModalOpen, setIsAddCustomModalOpen] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customCategory, setCustomCategory] = useState('Accessories');
+  const [customSize, setCustomSize] = useState('1 Unit');
+  const [customPrice, setCustomPrice] = useState('');
+  const [customStock, setCustomStock] = useState('10');
+  const [customMinStock, setCustomMinStock] = useState('3');
+
+  const handleCreateCustomProduct = (e) => {
+    e.preventDefault();
+    if (!customName.trim() || !customPrice) return;
+
+    addCustomProduct({
+      name: customName.trim(),
+      category: customCategory,
+      size: customSize.trim() || '1 Unit',
+      priceWithVat: parseFloat(customPrice),
+      stock: parseInt(customStock, 10) || 0,
+      minStock: parseInt(customMinStock, 10) || 3
+    });
+
+    setCustomName('');
+    setCustomPrice('');
+    setCustomStock('10');
+    setCustomMinStock('3');
+    setIsAddCustomModalOpen(false);
+  };
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('ALL'); // ALL, INSTOCK, LOW, OUT
@@ -232,6 +262,15 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
             title="Print or Save Inventory as PDF"
           >
             📄 PDF
+          </button>
+          <button
+            type="button"
+            className="btn-outline-sm"
+            onClick={() => setIsAddCustomModalOpen(true)}
+            title="Add local hardware or accessories (brushes, rollers, local putty)"
+          >
+            <PlusIcon size={15} />
+            + Custom Item
           </button>
           <button
             type="button"
@@ -646,6 +685,122 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
                 >
                   <CheckCircleIcon size={18} />
                   Save Count
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Add Custom Local Product Modal (Brushes, Rollers, Local Putty) */}
+      {isAddCustomModalOpen && (
+        <div className="modal-backdrop" onClick={() => setIsAddCustomModalOpen(false)}>
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title">Add Custom Shop Item</h3>
+                <p className="modal-subtitle">Add local accessories (brushes, rollers, putty) exclusive to your shop</p>
+              </div>
+              <button
+                type="button"
+                className="btn-modal-close"
+                onClick={() => setIsAddCustomModalOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCustomProduct} className="modal-body">
+              <div className="form-group mb-3">
+                <label className="form-label font-bold">Item Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Harris Paint Brush 4-inch, Local Putty 25kg"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-grid-2 mb-3">
+                <div className="form-group">
+                  <label className="form-label font-bold">Category</label>
+                  <select
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    className="form-select"
+                  >
+                    <option value="Accessories">Accessories</option>
+                    <option value="Tools">Tools</option>
+                    <option value="Primers & Putty">Primers & Putty</option>
+                    <option value="Interior">Interior</option>
+                    <option value="Exterior">Exterior</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label font-bold">Size / Pack *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 4-inch, 25kg, 1pc, 5L"
+                    value={customSize}
+                    onChange={(e) => setCustomSize(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group mb-3">
+                <label className="form-label font-bold">Selling Price (Inc. 15% VAT ETB) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  placeholder="e.g. 350.00"
+                  value={customPrice}
+                  onChange={(e) => setCustomPrice(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-grid-2 mb-3">
+                <div className="form-group">
+                  <label className="form-label font-bold">Initial Stock Units</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={customStock}
+                    onChange={(e) => setCustomStock(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label font-bold">Min Stock Warning Level</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={customMinStock}
+                    onChange={(e) => setCustomMinStock(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer mt-4" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn-outline-sm"
+                  onClick={() => setIsAddCustomModalOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                >
+                  Save Item to Store
                 </button>
               </div>
             </form>

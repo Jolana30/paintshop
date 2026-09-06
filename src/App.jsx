@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StockProvider, useStock } from './context/StockContext';
 import Navigation from './components/Navigation';
+import AuthPage from './pages/AuthPage';
 import Dashboard from './pages/Dashboard';
 import NewSale from './pages/NewSale';
 import StockIn from './pages/StockIn';
@@ -10,6 +11,8 @@ import Reports from './pages/Reports';
 import './App.css';
 
 function MainLayout() {
+  const { currentShop, toast } = useStock();
+
   const [activeTab, setActiveTabState] = useState(() => {
     const hash = window.location.hash.replace('#', '');
     const validTabs = ['dashboard', 'newsale', 'stockin', 'inventory', 'sales', 'reports'];
@@ -23,7 +26,6 @@ function MainLayout() {
 
   const [stockInProductId, setStockInProductId] = useState(null);
   const [salesFilterDate, setSalesFilterDate] = useState('');
-  const { toast } = useStock();
 
   const setActiveTab = (tab) => {
     setActiveTabState(tab);
@@ -39,6 +41,21 @@ function MainLayout() {
     setSalesFilterDate(dateStr);
     setActiveTab('sales');
   };
+
+  // If user is not logged into any shop, or shop is pending approval, render Auth Portal
+  if (!currentShop || currentShop.status === 'pending_approval') {
+    return (
+      <div className="auth-shell">
+        <AuthPage />
+        {toast && (
+          <div className={`toast-notification toast-${toast.type}`}>
+            <div className="toast-dot"></div>
+            <span>{toast.message}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">

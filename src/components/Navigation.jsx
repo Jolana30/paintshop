@@ -13,7 +13,7 @@ import {
 import { useStock } from '../context/StockContext';
 
 export default function Navigation({ activeTab, setActiveTab }) {
-  const { lowStockProducts, refreshData, cloudStatus } = useStock();
+  const { lowStockProducts, refreshData, cloudStatus, currentShop, logoutShop } = useStock();
   const lowCount = lowStockProducts.length;
 
   const navItems = [
@@ -34,14 +34,23 @@ export default function Navigation({ activeTab, setActiveTab }) {
             <PaintBucketIcon size={24} className="brand-icon" />
           </div>
           <div className="brand-text">
-            <h2>Jotun</h2>
-            <span className="brand-tag">Paint Manager</span>
+            <h2>PaintFlow</h2>
+            <span className="brand-tag">for Jotun Retailers</span>
+          </div>
+        </div>
+
+        {/* Active Shop Profile Badge */}
+        <div className="sidebar-active-shop-card">
+          <div className="active-shop-dot"></div>
+          <div className="active-shop-info">
+            <strong className="active-shop-name">{currentShop?.name || 'My Jotun Store'}</strong>
+            <span className="active-shop-location">{currentShop?.city_address || 'Addis Ababa'}</span>
           </div>
         </div>
 
         <div className={`sidebar-device-badge ${cloudStatus === 'connected' ? 'badge-cloud-online' : 'badge-cloud-local'}`}>
           <span className={`device-indicator ${cloudStatus === 'connected' ? 'indicator-online' : 'indicator-local'}`}></span>
-          <span>{cloudStatus === 'connected' ? '☁️ Supabase Cloud (Live)' : '⚡ Storage: Local (Offline)'}</span>
+          <span>{cloudStatus === 'connected' ? '☁️ Supabase Cloud (Live)' : '⚡ Storage: Local Branch'}</span>
         </div>
 
         <nav className="sidebar-nav">
@@ -78,16 +87,31 @@ export default function Navigation({ activeTab, setActiveTab }) {
             </div>
           )}
 
-          {/* Dedicated Working Refresh Button */}
+          {/* Sync Catalog Button */}
           <button
             type="button"
-            className="btn-refresh-sync"
+            className="btn-refresh-sync mb-2"
             onClick={refreshData}
             title="Reload latest official prices and product catalog"
           >
-            <RefreshCwIcon size={16} />
-            <span>Refresh Catalog Data</span>
+            <RefreshCwIcon size={15} />
+            <span>Sync Catalog</span>
           </button>
+
+          {/* Sign Out / Switch Branch Button */}
+          <button
+            type="button"
+            className="btn-sidebar-signout"
+            onClick={logoutShop}
+            title="Sign out of current store"
+          >
+            <span>⎋ Sign Out / Switch Store</span>
+          </button>
+
+          {/* Legal Nominative Fair Use Disclaimer */}
+          <p className="sidebar-legal-text">
+            Independent platform. Jotun, Fenomastic & Jotashield are trademarks of Jotun A/S.
+          </p>
         </div>
       </aside>
 
@@ -96,20 +120,20 @@ export default function Navigation({ activeTab, setActiveTab }) {
         <div className="mobile-brand">
           <PaintBucketIcon size={22} className="text-primary" />
           <div className="mobile-title-block">
-            <h3>Jotun Paint Manager</h3>
-            <span className="mobile-page-name">{navItems.find(n => n.id === activeTab)?.label}</span>
+            <h3>PaintFlow</h3>
+            <span className="mobile-page-name">{currentShop?.name || 'Jotun Retailer'}</span>
           </div>
         </div>
 
         <div className="mobile-header-actions">
-          {/* Working Mobile Refresh Icon */}
           <button
             type="button"
             className="mobile-refresh-btn"
-            onClick={refreshData}
-            title="Refresh Catalog Data"
+            onClick={logoutShop}
+            title="Sign Out / Switch Store"
+            style={{ fontSize: '13px', fontWeight: 'bold' }}
           >
-            <RefreshCwIcon size={16} />
+            ⎋
           </button>
 
           <span

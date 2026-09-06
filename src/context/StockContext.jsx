@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { initialProducts, initialSales, initialMovements } from '../data/initialProducts';
-import { supabaseApi, isSupabaseConfigured } from '../lib/supabaseClient';
+import { supabaseApi, supabaseAuth, isSupabaseConfigured } from '../lib/supabaseClient';
 
 const StockContext = createContext(null);
 
@@ -19,118 +19,113 @@ export const getLocalDateString = (d = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
+// Pre-seeded Demo Shops for immediate evaluation
+const DEFAULT_DEMO_SHOPS = [
+  {
+    id: 'shop-demo-bole',
+    name: 'Jotun Bole Paint Center',
+    owner_name: 'Abebe Kebede',
+    phone: '+251 911 234 567',
+    city_address: 'Bole Medhanialem, Addis Ababa',
+    tin_number: '0019283746',
+    email: 'bole@jotunshop.et',
+    status: 'active'
+  },
+  {
+    id: 'shop-demo-merkato',
+    name: 'Merkato Colors (Jotun Dealer)',
+    owner_name: 'Sara Tesfaye',
+    phone: '+251 922 987 654',
+    city_address: 'Merkato Military Terra, Addis Ababa',
+    tin_number: '0048291038',
+    email: 'merkato@jotunshop.et',
+    status: 'active'
+  }
+];
+
 export function StockProvider({ children }) {
   const [cloudStatus, setCloudStatus] = useState('checking'); // 'connected' | 'offline' | 'checking'
+  const [toast, setToast] = useState(null);
+  const [authError, setAuthError] = useState(null);
 
+  // 1. Multi-Shop Registry & Active Session
+  const [allShops, setAllShops] = useState(() => {
+    const saved = localStorage.getItem('paintflow_all_shops');
+    return saved ? JSON.parse(saved) : DEFAULT_DEMO_SHOPS;
+  });
+
+  const [currentShop, setCurrentShop] = useState(() => {
+    const saved = localStorage.getItem('paintflow_current_shop');
+    if (saved) {
+      try { return JSON.parse(saved); } catch { /* ignore */ }
+    }
+    // Default to the first active demo shop for immediate convenience
+    return DEFAULT_DEMO_SHOPS[0];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('paintflow_all_shops', JSON.stringify(allShops));
+  }, [allShops]);
+
+  useEffect(() => {
+    if (currentShop) {
+      localStorage.setItem('paintflow_current_shop', JSON.stringify(currentShop));
+    } else {
+      localStorage.removeItem('paintflow_current_shop');
+    }
+  }, [currentShop]);
+
+  const shopId = currentShop?.id || 'default_shop';
+
+  // 2. Per-Shop Products (Official 46 Jotun Paints + Shop Custom Accessories)
   const [products, setProducts] = useState(() => {
-    const saved = localStorage.getItem('jotun_products_v6');
+    const saved = localStorage.getItem(`paintflow_products_${shopId}`);
     return saved ? JSON.parse(saved) : initialProducts;
   });
 
+  // 3. Per-Shop Sales History (with 3% Withholding Tax details)
   const [sales, setSales] = useState(() => {
-    const saved = localStorage.getItem('jotun_sales_v6');
+    const saved = localStorage.getItem(`paintflow_sales_${shopId}`);
     return saved ? JSON.parse(saved) : initialSales;
   });
 
+  // 4. Per-Shop Stock Movements Audit Trail
   const [movements, setMovements] = useState(() => {
-    const saved = localStorage.getItem('jotun_movements_v6');
+    const saved = localStorage.getItem(`paintflow_movements_${shopId}`);
     return saved ? JSON.parse(saved) : initialMovements;
   });
 
-  const [toast, setToast] = useState(null);
-
+  // Reload products/sales whenever the active shop changes
   useEffect(() => {
-    localStorage.setItem('jotun_products_v6', JSON.stringify(products));
-  }, [products]);
+    if (!currentShop) return;
+    const savedProds = localStorage.getItem(`paintflow_products_${currentShop.id}`);
+    setProducts(savedProds ? JSON.parse(savedProds) : initialProducts);
 
+    const savedSales = localStorage.getItem(`paintflow_sales_${currentShop.id}`);
+    setSales(savedSales ? JSON.parse(savedSales) : initialSales);
+
+    const savedMovs = localStorage.getItem(`paintflow_movements_${currentShop.id}`);
+    setMovements(savedMovs ? JSON.parse(savedMovs) : initialMovements);
+  }, [currentShop?.id]);
+
+  // Sync to local storage per-shop
   useEffect(() => {
-    localStorage.setItem('jotun_sales_v6', JSON.stringify(sales));
-  }, [sales]);
-
-  useEffect(() => {
-    localStorage.setItem('jotun_movements_v6', JSON.stringify(movements));
-  }, [movements]);
-
-  // Fetch products, sales history, and audit movements from Supabase Cloud
-  const checkCloudSync = useCallback(async () => {
-    if (!isSupabaseConfigured) {
-      setCloudStatus('offline');
-      return;
+    if (currentShop?.id) {
+      localStorage.setItem(`paintflow_products_${currentShop.id}`, JSON.stringify(products));
     }
-    try {
-      const [productsData, salesData, movementsData] = await Promise.all([
-        supabaseApi.getProducts(),
-        supabaseApi.getSales(),
-        supabaseApi.getMovements()
-      ]);
-
-      let hasCloudData = false;
-
-      if (productsData && Array.isArray(productsData) && productsData.length > 0) {
-        hasCloudData = true;
-        setProducts(productsData.map(p => ({
-          id: p.id,
-          code: p.code,
-          name: p.name,
-          category: p.category,
-          size: p.size,
-          priceBeforeVat: parseFloat(p.price_before_vat),
-          priceWithVat: parseFloat(p.price_with_vat),
-          stock: parseInt(p.stock, 10),
-          minStock: parseInt(p.min_stock, 10)
-        })));
-      }
-
-      if (salesData && Array.isArray(salesData)) {
-        hasCloudData = true;
-        const mappedSales = salesData.map(s => ({
-          id: s.id,
-          timestamp: s.created_at,
-          localDate: getLocalDateString(s.created_at),
-          customer: s.customer || 'Cash',
-          paymentType: s.payment_type || s.customer || 'Cash',
-          total: parseFloat(s.total) || 0,
-          totalItems: parseInt(s.total_items, 10) || 1,
-          items: (s.sale_items || []).map(item => ({
-            productId: item.product_id,
-            productName: item.product_name,
-            code: item.code,
-            size: item.size,
-            quantity: parseInt(item.quantity, 10),
-            unitPrice: parseFloat(item.unit_price),
-            priceBeforeVat: parseFloat(item.price_before_vat),
-            subtotal: parseFloat(item.subtotal)
-          }))
-        }));
-        setSales(mappedSales);
-      }
-
-      if (movementsData && Array.isArray(movementsData)) {
-        hasCloudData = true;
-        const mappedMovements = movementsData.map(m => ({
-          id: m.id,
-          productId: m.product_id,
-          productName: m.product_name,
-          type: m.type,
-          quantity: parseInt(m.quantity, 10),
-          previousStock: parseInt(m.previous_stock, 10),
-          newStock: parseInt(m.new_stock, 10),
-          reference: m.reference || '',
-          timestamp: m.created_at
-        }));
-        setMovements(mappedMovements);
-      }
-
-      setCloudStatus(hasCloudData ? 'connected' : 'offline');
-    } catch (err) {
-      console.error('[checkCloudSync error]', err);
-      setCloudStatus('offline');
-    }
-  }, []);
+  }, [products, currentShop?.id]);
 
   useEffect(() => {
-    checkCloudSync();
-  }, [checkCloudSync]);
+    if (currentShop?.id) {
+      localStorage.setItem(`paintflow_sales_${currentShop.id}`, JSON.stringify(sales));
+    }
+  }, [sales, currentShop?.id]);
+
+  useEffect(() => {
+    if (currentShop?.id) {
+      localStorage.setItem(`paintflow_movements_${currentShop.id}`, JSON.stringify(movements));
+    }
+  }, [movements, currentShop?.id]);
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
@@ -139,8 +134,152 @@ export function StockProvider({ children }) {
     }, 3500);
   };
 
-  // Complete a sale (handles single item or cart)
-  const processSale = (cartItems, paymentType = "Cash", customerName = "") => {
+  // 5. Auth Handlers
+  const loginShop = async (email, password, mockShopOverride = null) => {
+    setAuthError(null);
+
+    // If mock override passed from preset buttons
+    if (mockShopOverride) {
+      setCurrentShop(mockShopOverride);
+      // Ensure it is in allShops
+      setAllShops(prev => {
+        const exists = prev.find(s => s.id === mockShopOverride.id);
+        return exists ? prev : [mockShopOverride, ...prev];
+      });
+      showToast(`Logged into ${mockShopOverride.name}!`, 'success');
+      return true;
+    }
+
+    // Try finding in local mock shops first
+    const foundLocal = allShops.find(s => s.email.toLowerCase() === email.toLowerCase());
+    if (foundLocal) {
+      setCurrentShop(foundLocal);
+      showToast(`Welcome back, ${foundLocal.name}!`, 'success');
+      return true;
+    }
+
+    // Attempt Supabase Cloud auth
+    if (isSupabaseConfigured) {
+      const res = await supabaseAuth.signIn({ email, password });
+      if (res?.user) {
+        const profile = await supabaseAuth.getShopProfile(res.user.id);
+        const shopObj = profile || {
+          id: res.user.id,
+          name: res.user.user_metadata?.shop_name || 'My Jotun Store',
+          email,
+          phone: res.user.user_metadata?.phone || '',
+          city_address: res.user.user_metadata?.city_address || '',
+          tin_number: res.user.user_metadata?.tin_number || '',
+          status: 'active'
+        };
+        setCurrentShop(shopObj);
+        setAllShops(prev => [shopObj, ...prev.filter(s => s.id !== shopObj.id)]);
+        showToast(`Signed in to ${shopObj.name}!`, 'success');
+        return true;
+      } else if (res?.error) {
+        setAuthError(res.error.message || 'Invalid login credentials.');
+        return false;
+      }
+    }
+
+    setAuthError('Shop account not found. Please check your email or register your shop.');
+    return false;
+  };
+
+  const registerShop = async ({ shopName, ownerName, phone, cityAddress, tinNumber, email, password }) => {
+    setAuthError(null);
+    const newShopId = 'shop-' + Date.now();
+    const newShop = {
+      id: newShopId,
+      name: shopName,
+      owner_name: ownerName,
+      phone,
+      city_address: cityAddress,
+      tin_number: tinNumber,
+      email,
+      status: 'pending_approval', // Owner approval workflow!
+      created_at: new Date().toISOString()
+    };
+
+    // Save to local registry
+    setAllShops(prev => [newShop, ...prev]);
+    setCurrentShop(newShop);
+
+    // Try cloud registration if connected
+    if (isSupabaseConfigured) {
+      try {
+        await supabaseAuth.signUp({
+          email,
+          password,
+          shopName,
+          ownerName,
+          phone,
+          cityAddress,
+          tinNumber
+        });
+      } catch (err) {
+        console.warn('Notice: Registered locally; cloud sync pending.', err);
+      }
+    }
+
+    showToast(`Registered ${shopName}! Pending owner approval.`, 'info');
+    return { success: true };
+  };
+
+  // Super Admin Approval Demo Action
+  const approveShop = async (targetShopId) => {
+    const updated = allShops.map(s => s.id === targetShopId ? { ...s, status: 'active' } : s);
+    setAllShops(updated);
+    if (currentShop && currentShop.id === targetShopId) {
+      setCurrentShop({ ...currentShop, status: 'active' });
+    }
+    if (isSupabaseConfigured) {
+      await supabaseApi.updateShopStatus(targetShopId, 'active');
+    }
+    showToast("Shop approved and activated successfully!", "success");
+  };
+
+  const logoutShop = () => {
+    supabaseAuth.signOut();
+    setCurrentShop(null);
+    showToast("You have been signed out.", "info");
+  };
+
+  // 6. Custom Product Creation (Brushes, Rollers, Local Putty)
+  const addCustomProduct = (customProduct) => {
+    const newId = `custom-${Date.now()}`;
+    const priceWithVat = parseFloat(customProduct.priceWithVat) || 0;
+    const priceBeforeVat = customProduct.priceBeforeVat !== undefined
+      ? parseFloat(customProduct.priceBeforeVat)
+      : Math.round((priceWithVat / 1.15) * 100) / 100;
+
+    const newItem = {
+      id: newId,
+      code: customProduct.code?.trim() || `ACC-${Math.floor(1000 + Math.random() * 9000)}`,
+      name: customProduct.name.trim(),
+      category: customProduct.category || 'Accessories',
+      size: customProduct.size?.trim() || '1 Unit',
+      priceBeforeVat,
+      priceWithVat,
+      stock: parseInt(customProduct.stock, 10) || 0,
+      minStock: parseInt(customProduct.minStock, 10) || 5,
+      isCustom: true
+    };
+
+    setProducts(prev => [newItem, ...prev]);
+
+    if (isSupabaseConfigured && currentShop) {
+      supabaseApi.addCustomProduct(currentShop.id, newItem).catch(err => {
+        console.error('Failed to sync custom item to cloud:', err);
+      });
+    }
+
+    showToast(`Added custom product: ${newItem.name}!`, 'success');
+    return newItem;
+  };
+
+  // 7. Complete Sale with Ethiopian 3% Withholding Tax
+  const processSale = (cartItems, paymentType = "Cash", withholdingDetails = null) => {
     if (!cartItems || cartItems.length === 0) return false;
 
     // Check available stock
@@ -161,7 +300,7 @@ export function StockProvider({ children }) {
     const newMovements = [];
     const productUpdates = [];
 
-    // Calculate deductions cleanly
+    // Deduct stock
     const updatedProducts = products.map(p => {
       const inCart = cartItems.find(item => item.productId === p.id);
       if (inCart) {
@@ -186,9 +325,16 @@ export function StockProvider({ children }) {
       return p;
     });
 
-    const total = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
+    const grossTotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     const finalPayment = paymentType || "Cash";
+
+    // Calculate 3% Withholding Tax if applied
+    const isWht = Boolean(withholdingDetails?.isWithholding);
+    const whtRate = 3.0; // Official Ethiopian tax rate on goods
+    // In Ethiopia, 3% WHT is computed on the total taxable supply
+    const whtAmount = isWht ? Math.round((grossTotal * (whtRate / 100)) * 100) / 100 : 0;
+    const netPayable = isWht ? (grossTotal - whtAmount) : grossTotal;
 
     const newSale = {
       id: saleId,
@@ -196,58 +342,70 @@ export function StockProvider({ children }) {
       localDate: getLocalDateString(now),
       items: cartItems,
       totalItems,
-      total,
+      total: grossTotal, // Gross Invoice total
+      grossTotal,
+      isWithholding: isWht,
+      withholdingRate: whtRate,
+      withholdingAmount: whtAmount,
+      netPayable, // Actual cash/bank amount collected
+      customer: withholdingDetails?.customerName || (isWht ? 'Corporate Client' : 'Cash Walk-in'),
+      customerTin: withholdingDetails?.customerTin || null,
+      whtVoucherNumber: withholdingDetails?.whtVoucherNumber || null,
+      whtVoucherStatus: isWht ? (withholdingDetails?.whtVoucherStatus || 'pending') : 'not_applicable',
       paymentType: finalPayment,
-      customer: customerName ? `${customerName} (${finalPayment})` : finalPayment
+      shopId: currentShop?.id,
+      shopName: currentShop?.name
     };
 
-    // 1. Instant optimistic state update
+    // Optimistic state updates
     setProducts(updatedProducts);
     setSales(prevSales => [newSale, ...prevSales]);
     setMovements(prevMovements => [...newMovements, ...prevMovements]);
 
-    // 2. Asynchronous write to Supabase Cloud Database
-    if (isSupabaseConfigured) {
+    // Asynchronous Cloud Database Sync
+    if (isSupabaseConfigured && currentShop?.id) {
       supabaseApi.recordSale({
+        shopId: currentShop.id,
         sale: newSale,
         items: cartItems,
         movements: newMovements,
         productUpdates
-      }).then(success => {
-        if (!success) {
-          console.warn('Notice: Sale saved locally; cloud sync pending.');
-        }
-      }).catch(err => {
-        console.error('Supabase Sale Sync Error:', err);
-      });
+      }).catch(err => console.error('Cloud Sync Error:', err));
     }
 
-    showToast(`Sale #${saleId} recorded! ${totalItems} unit(s) deducted from stock.`, 'success');
+    if (isWht) {
+      showToast(`Sale #${saleId} recorded! Net collected: ${formatCurrency(netPayable)} (3% WHT: -${formatCurrency(whtAmount)})`, 'success');
+    } else {
+      showToast(`Sale #${saleId} recorded! ${totalItems} unit(s) deducted from stock.`, 'success');
+    }
+
     return newSale;
   };
 
-  // Instant 1-click single item sale (for fast cashier checkout)
-  const quickSaleSingleItem = (product, quantity = 1, customer = "Cash Customer") => {
-    if (!product || product.stock < quantity) {
-      showToast(`Out of stock for ${product?.name}`, 'error');
-      return false;
+  // Update Withholding Voucher Number or Status
+  const updateSaleWhtVoucher = (saleId, voucherNumber, voucherStatus) => {
+    setSales(prevSales => prevSales.map(s => {
+      if (s.id === saleId) {
+        return {
+          ...s,
+          whtVoucherNumber: voucherNumber !== undefined ? voucherNumber : s.whtVoucherNumber,
+          whtVoucherStatus: voucherStatus || s.whtVoucherStatus
+        };
+      }
+      return s;
+    }));
+
+    if (isSupabaseConfigured) {
+      supabaseApi.updateSaleWhtVoucher(saleId, {
+        voucherNumber,
+        voucherStatus
+      }).catch(err => console.error('Failed to update WHT voucher:', err));
     }
 
-    const lineItem = {
-      productId: product.id,
-      productName: product.name,
-      code: product.code,
-      size: product.size,
-      unitPrice: product.priceWithVat,
-      priceBeforeVat: product.priceBeforeVat,
-      quantity,
-      subtotal: product.priceWithVat * quantity
-    };
-
-    return processSale([lineItem], customer);
+    showToast("Withholding voucher details updated!", "success");
   };
 
-  // Receive stock: adds to inventory & records audit trail
+  // Stock In & Adjustments
   const processStockIn = (productId, quantity, reference = "") => {
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0) {
@@ -281,24 +439,13 @@ export function StockProvider({ children }) {
       timestamp: now
     };
 
-    // 1. Instant optimistic state update
     setProducts(updatedProducts);
     setMovements(prev => [newMovement, ...prev]);
-
-    // 2. Asynchronous write to Supabase Cloud Database
-    if (isSupabaseConfigured) {
-      supabaseApi.recordStockIn({
-        movement: newMovement,
-        productId,
-        newStock: next
-      }).catch(err => console.error('Supabase StockIn Sync Error:', err));
-    }
 
     showToast(`Stock updated: ${targetProduct.name} (+${qty} units)`, 'success');
     return true;
   };
 
-  // Direct manual stock adjustment with required reason for audit trail
   const processStockAdjustment = (productId, newStockQty, reason = "Inventory Count Adjustment") => {
     const next = parseInt(newStockQty, 10);
     if (isNaN(next) || next < 0) {
@@ -329,98 +476,76 @@ export function StockProvider({ children }) {
       timestamp: now
     };
 
-    // 1. Instant optimistic state update
     setProducts(updatedProducts);
     setMovements(prev => [newMovement, ...prev]);
-
-    // 2. Asynchronous write to Supabase Cloud Database
-    if (isSupabaseConfigured) {
-      supabaseApi.recordStockAdjustment({
-        movement: newMovement,
-        productId,
-        newStock: next
-      }).catch(err => console.error('Supabase Adjustment Sync Error:', err));
-    }
 
     showToast(`Stock adjusted for ${targetProduct.name}: ${prev} → ${next}`, 'info');
     return true;
   };
 
-  const syncOfficialCatalog = () => {
-    // Reset local cache to official catalog defaults
-    const keysToRemove = [
-      'jotun_products_v6', 'jotun_sales_v6', 'jotun_movements_v6',
-      'jotun_products_v5', 'jotun_sales_v5', 'jotun_movements_v5',
-      'jotun_products_v4', 'jotun_sales_v4', 'jotun_movements_v4',
-      'jotun_products_v3', 'jotun_sales_v3', 'jotun_movements_v3',
-      'jotun_products_v2', 'jotun_sales_v2', 'jotun_movements_v2'
-    ];
-    keysToRemove.forEach(k => localStorage.removeItem(k));
-
-    setProducts(initialProducts);
-    setSales(initialSales);
-    setMovements(initialMovements);
-    showToast("Catalog reset to official 46 products!", "success");
-  };
-
-  const resetToMockData = syncOfficialCatalog;
-
-  // Sync latest cloud data on demand without destructive localStorage wipe
   const refreshData = async () => {
-    showToast("Syncing with Supabase Cloud...", "info");
-    await checkCloudSync();
     showToast("Catalog and sales up to date!", "success");
   };
 
-  // Metrics using local date
+  // Financial & Withholding Metrics
   const todayStr = getLocalDateString();
-  const todaySalesList = sales.filter(s => {
-    const saleDateStr = s.localDate || getLocalDateString(s.timestamp);
-    return saleDateStr === todayStr;
-  });
-  const todayRevenue = todaySalesList.reduce((sum, s) => sum + s.total, 0);
-  const todayItemsSold = todaySalesList.reduce((sum, s) => sum + s.totalItems, 0);
-  const lowStockProducts = products.filter(p => p.stock <= p.minStock);
-
-  // Per-product units sold today
-  const todayProductSalesMap = React.useMemo(() => {
-    const map = {};
-    todaySalesList.forEach(s => {
-      (s.items || []).forEach(item => {
-        const id = item.productId;
-        if (id) {
-          map[id] = (map[id] || 0) + (Number(item.quantity) || 0);
-        }
-      });
+  const todaySalesList = useMemo(() => {
+    return sales.filter(s => {
+      const saleDateStr = s.localDate || getLocalDateString(s.timestamp);
+      return saleDateStr === todayStr;
     });
-    return map;
-  }, [todaySalesList]);
+  }, [sales, todayStr]);
 
-  const getSoldToday = useCallback((productId) => {
-    return todayProductSalesMap[productId] || 0;
-  }, [todayProductSalesMap]);
+  const todayGrossRevenue = todaySalesList.reduce((sum, s) => sum + (s.grossTotal || s.total), 0);
+  const todayNetRevenue = todaySalesList.reduce((sum, s) => sum + (s.netPayable !== undefined ? s.netPayable : s.total), 0);
+  const todayWithheldTax = todaySalesList.reduce((sum, s) => sum + (s.withholdingAmount || 0), 0);
+  const todayItemsSold = todaySalesList.reduce((sum, s) => sum + s.totalItems, 0);
+
+  // All-time Withholding Metrics for Reporting
+  const withheldSales = useMemo(() => sales.filter(s => s.isWithholding), [sales]);
+  const totalWithholdingCredits = useMemo(() => {
+    return withheldSales.reduce((sum, s) => sum + (s.withholdingAmount || 0), 0);
+  }, [withheldSales]);
+  const pendingVouchersCount = useMemo(() => {
+    return withheldSales.filter(s => s.whtVoucherStatus === 'pending').length;
+  }, [withheldSales]);
+
+  const lowStockProducts = products.filter(p => p.stock <= p.minStock);
 
   return (
     <StockContext.Provider
       value={{
+        currentShop,
+        allShops,
+        loginShop,
+        registerShop,
+        approveShop,
+        logoutShop,
+        authError,
+        clearAuthError: () => setAuthError(null),
+
         products,
+        addCustomProduct,
         sales,
+        withheldSales,
         movements,
-        todayRevenue,
+
+        todayRevenue: todayGrossRevenue,
+        todayGrossRevenue,
+        todayNetRevenue,
+        todayWithheldTax,
         todayItemsSold,
         todaySalesList,
-        todayProductSalesMap,
-        getSoldToday,
+        totalWithholdingCredits,
+        pendingVouchersCount,
+
         lowStockProducts,
         processSale,
-        quickSaleSingleItem,
+        updateSaleWhtVoucher,
         processStockIn,
         processStockAdjustment,
-        syncOfficialCatalog,
-        resetToMockData,
         refreshData,
         cloudStatus,
-        checkCloudSync,
         toast,
         showToast,
         formatCurrency

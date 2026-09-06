@@ -9,7 +9,11 @@ import { downloadExcelCsv } from '../utils/exportExcel';
 import { printOrSaveAsPdf } from '../utils/exportPdf';
 
 export default function Sales({ setActiveTab, initialDate = '', onClearDateFilter }) {
-  const { sales, formatCurrency } = useStock();
+  const { sales, formatCurrency, currentShop, updateSaleWhtVoucher } = useStock();
+  const [editingVoucherSale, setEditingVoucherSale] = useState(null);
+  const [inputVoucherNo, setInputVoucherNo] = useState('');
+  const [inputVoucherStatus, setInputVoucherStatus] = useState('received');
+  const [whtFilter, setWhtFilter] = useState('ALL'); // 'ALL' | 'WHT_ONLY' | 'PENDING_ONLY'
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSale, setSelectedSale] = useState(null);
 
@@ -389,6 +393,33 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
             {/* Payment Type Filter (Cash, CBE, Telebirr, Sinke, Coop, Awash, Dashen) */}
             <div className="sales-filter-row">
               <div className="filter-group">
+                <span className="filter-group-label">Tax / WHT:</span>
+                <button
+                  type="button"
+                  className={`filter-toggle-btn ${whtFilter === 'ALL' ? 'active' : ''}`}
+                  onClick={() => setWhtFilter('ALL')}
+                >
+                  All Invoices
+                </button>
+                <button
+                  type="button"
+                  className={`filter-toggle-btn ${whtFilter === 'WHT_ONLY' ? 'active' : ''}`}
+                  onClick={() => setWhtFilter('WHT_ONLY')}
+                >
+                  📋 3% WHT Sales
+                </button>
+                <button
+                  type="button"
+                  className={`filter-toggle-btn ${whtFilter === 'PENDING_ONLY' ? 'active' : ''}`}
+                  onClick={() => setWhtFilter('PENDING_ONLY')}
+                >
+                  ⏳ Pending Vouchers
+                </button>
+              </div>
+            </div>
+
+            <div className="sales-filter-row">
+              <div className="filter-group">
                 <span className="filter-group-label">Payment / Bank:</span>
                 {['ALL', 'Cash', 'CBE', 'Telebirr', 'Sinke', 'Coop', 'Awash', 'Dashen'].map(type => (
                   <button
@@ -464,11 +495,39 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
                     return (
                       <tr key={sale.id} className={isRecent ? 'row-recently-recorded' : ''}>
                         <td>
-                          <strong className="text-primary font-mono">{sale.id}</strong>
-                          {isRecent && (
-                            <span className="badge-pill badge-healthy" style={{ marginLeft: '6px', fontSize: '10px' }}>
-                              JUST RECORDED
-                            </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                            <strong className="text-primary font-mono">{sale.id}</strong>
+                            {isRecent && (
+                              <span className="badge-pill badge-healthy" style={{ fontSize: '9px' }}>
+                                NEW
+                              </span>
+                            )}
+                            {sale.isWithholding && (
+                              <span className="badge-pill badge-warning" style={{ fontSize: '9px' }}>
+                                3% WHT
+                              </span>
+                            )}
+                          </div>
+                          {sale.isWithholding && (
+                            <div className="text-xs text-muted mt-1">
+                              {sale.whtVoucherStatus === 'received' ? (
+                                <span className="text-success font-semibold">✓ Voucher: {sale.whtVoucherNumber || 'On file'}</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn-link-action text-warning"
+                                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline', fontSize: '11px' }}
+                                  onClick={() => {
+                                    setEditingVoucherSale(sale);
+                                    setInputVoucherNo(sale.whtVoucherNumber || '');
+                                    setInputVoucherStatus('received');
+                                  }}
+                                  title="Click to enter voucher serial"
+                                >
+                                  ⏳ Voucher Pending ✎
+                                </button>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td>
@@ -493,7 +552,16 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
                           <strong>{sale.totalItems}</strong>
                         </td>
                         <td>
-                          <strong className="text-success text-md">{formatCurrency(sale.total)}</strong>
+                          {sale.isWithholding ? (
+                            <div>
+                              <strong className="text-success text-md">{formatCurrency(sale.netPayable)}</strong>
+                              <div className="text-xs text-muted" style={{ textDecoration: 'line-through' }}>
+                                Gross: {formatCurrency(sale.grossTotal || sale.total)}
+                              </div>
+                            </div>
+                          ) : (
+                            <strong className="text-success text-md">{formatCurrency(sale.total)}</strong>
+                          )}
                         </td>
                         <td>
                           <button
@@ -649,6 +717,72 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
                 Close Receipt
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Update Withholding Voucher Modal */}
+      {editingVoucherSale && (
+        <div className="modal-backdrop" onClick={() => setEditingVoucherSale(null)}>
+          <div className="modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <div className="modal-header">
+              <div>
+                <h3 className="modal-title">Withholding Tax Voucher</h3>
+                <p className="modal-subtitle">Invoice #{editingVoucherSale.id} • {editingVoucherSale.customer}</p>
+              </div>
+              <button
+                type="button"
+                className="btn-modal-close"
+                onClick={() => setEditingVoucherSale(null)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              updateSaleWhtVoucher(editingVoucherSale.id, inputVoucherNo.trim(), inputVoucherStatus);
+              setEditingVoucherSale(null);
+            }} className="modal-body">
+              <div className="form-group mb-3">
+                <label className="form-label font-bold">Voucher Serial Number (የደረሰኝ ቁጥር)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. WHT-2026-08942"
+                  value={inputVoucherNo}
+                  onChange={(e) => setInputVoucherNo(e.target.value)}
+                  className="form-input"
+                />
+              </div>
+
+              <div className="form-group mb-3">
+                <label className="form-label font-bold">Voucher Status</label>
+                <select
+                  value={inputVoucherStatus}
+                  onChange={(e) => setInputVoucherStatus(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="received">✓ Physical / Digital Voucher In Hand</option>
+                  <option value="pending">⏳ Still Pending Collection from Client</option>
+                </select>
+              </div>
+
+              <div className="modal-footer mt-4" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn-outline-sm"
+                  onClick={() => setEditingVoucherSale(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                >
+                  Save Voucher Details
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

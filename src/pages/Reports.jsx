@@ -9,9 +9,76 @@ import { downloadExcelCsv } from '../utils/exportExcel';
 import { printOrSaveAsPdf } from '../utils/exportPdf';
 
 export default function Reports() {
-  const { products, sales, movements, lowStockProducts, todayRevenue, todayItemsSold, formatCurrency } = useStock();
+  const {
+    products,
+    sales,
+    withheldSales,
+    movements,
+    lowStockProducts,
+    todayRevenue,
+    todayNetRevenue,
+    todayWithheldTax,
+    todayItemsSold,
+    totalWithholdingCredits,
+    pendingVouchersCount,
+    currentShop,
+    formatCurrency
+  } = useStock();
 
-  const [activeSubTab, setActiveSubTab] = useState('summary'); // 'summary', 'audit'
+  const [activeSubTab, setActiveSubTab] = useState('summary'); // 'summary', 'audit', 'withholding'
+
+  // Export Withholding Tax Ledger to Excel (Ministry of Revenues Format)
+  const handleExportWhtExcel = () => {
+    const headers = ["Invoice #", "Date", "Customer / Contractor", "Customer TIN", "Voucher Number", "Gross Total (ETB)", "3% Withholding Tax (ETB)", "Net Cash Collected (ETB)", "Voucher Status"];
+    const rows = (withheldSales || []).map(s => {
+      const dt = new Date(s.timestamp);
+      return [
+        s.id,
+        dt.toLocaleDateString(),
+        s.customer,
+        s.customerTin || 'N/A',
+        s.whtVoucherNumber || 'PENDING',
+        (s.grossTotal || s.total).toFixed(2),
+        (s.withholdingAmount || 0).toFixed(2),
+        (s.netPayable !== undefined ? s.netPayable : s.total).toFixed(2),
+        s.whtVoucherStatus === 'received' ? 'RECEIVED' : 'PENDING'
+      ];
+    });
+
+    downloadExcelCsv("withholding_tax_mor_ledger", headers, rows);
+  };
+
+  // Export Withholding Tax Ledger to PDF
+  const handleExportWhtPdf = () => {
+    const columns = ["Invoice", "Date", "Customer / Contractor", "Customer TIN", "Voucher #", "Gross", "3% WHT", "Net Paid"];
+    const rows = (withheldSales || []).map(s => {
+      const dt = new Date(s.timestamp);
+      return [
+        s.id,
+        dt.toLocaleDateString(),
+        `<strong>${s.customer}</strong>`,
+        s.customerTin || 'N/A',
+        s.whtVoucherNumber || '<em>Pending</em>',
+        formatCurrency(s.grossTotal || s.total),
+        `<span style="color:#dc2626; font-weight:bold;">-${formatCurrency(s.withholdingAmount)}</span>`,
+        formatCurrency(s.netPayable)
+      ];
+    });
+
+    const totalGross = (withheldSales || []).reduce((sum, s) => sum + (s.grossTotal || s.total), 0);
+
+    printOrSaveAsPdf({
+      title: "Withholding Tax (WHT) Ledger & Credits",
+      subtitle: `${currentShop?.name || 'Jotun Paint Store'} — Ministry of Revenues (MoR) Schedule as of ${new Date().toLocaleDateString()}`,
+      columns,
+      rows,
+      summaryCards: [
+        { label: "Total Gross Withheld Sales", value: formatCurrency(totalGross) },
+        { label: "Total 3% WHT Credits", value: formatCurrency(totalWithholdingCredits) },
+        { label: "Pending Vouchers", value: `${pendingVouchersCount} pending` }
+      ]
+    });
+  };
   const [movementFilter, setMovementFilter] = useState('ALL'); // ALL, SALE, STOCK_IN, ADJUSTMENT
 
   // Total inventory metrics
@@ -144,7 +211,7 @@ export default function Reports() {
                 📄 Export PDF
               </button>
             </>
-          ) : (
+          ) : activeSubTab === 'audit' ? (
             <>
               <button
                 type="button"
@@ -161,6 +228,25 @@ export default function Reports() {
                 title="Print or Save Audit Trail as PDF"
               >
                 📄 Export PDF
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn-export-excel"
+                onClick={handleExportWhtExcel}
+                title="Download MoR Withholding Tax Excel Schedule"
+              >
+                📊 Export WHT Schedule
+              </button>
+              <button
+                type="button"
+                className="btn-export-pdf"
+                onClick={handleExportWhtPdf}
+                title="Print or Save WHT Summary as PDF"
+              >
+                📄 Print WHT Summary
               </button>
             </>
           )}
@@ -182,6 +268,13 @@ export default function Reports() {
           onClick={() => setActiveSubTab('audit')}
         >
           Stock Movement Audit Trail ({movements.length})
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${activeSubTab === 'withholding' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('withholding')}
+        >
+          📋 3% Withholding Tax (WHT) Ledger ({withheldSales?.length || 0})
         </button>
       </div>
 
@@ -388,6 +481,107 @@ export default function Reports() {
             </table>
           </div>
         </div>
+      )}
+      {/* 3% Withholding Tax (WHT) Ledger Tab */}
+      {activeSubTab === 'withholding' && (
+        <>
+          {/* Top KPI Cards for Withholding */}
+          <div className="stats-grid mb-4">
+            <div className="stat-card">
+              <div className="stat-icon-wrap bg-blue-subtle text-primary">
+                <ReceiptTextIcon size={22} />
+              </div>
+              <div className="stat-content">
+                <span className="stat-label">Total Withheld Sales</span>
+                <span className="stat-value">{withheldSales?.length || 0} Invoices</span>
+                <span className="stat-subtext">Corporate & Contractor orders</span>
+              </div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon-wrap bg-emerald-subtle text-success">
+                <BarChart3Icon size={22} />
+              </div>
+              <div className="stat-content">
+                <span className="stat-label">3% Tax Credits Earned</span>
+                <span className="stat-value">{formatCurrency(totalWithholdingCredits)}</span>
+                <span className="stat-subtext">Claimable from Ministry of Revenues</span>
+              </div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-icon-wrap bg-purple-subtle text-purple">
+                <PackageIcon size={22} />
+              </div>
+              <div className="stat-content">
+                <span className="stat-label">Pending Vouchers</span>
+                <span className="stat-value">{pendingVouchersCount}</span>
+                <span className="stat-subtext">Vouchers awaiting physical collection</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Withholding Table */}
+          <div className="section-card">
+            <div className="section-header-flex">
+              <div>
+                <h3 className="section-title">Withholding Tax (WHT) Schedule</h3>
+                <p className="section-subtitle">
+                  Detailed register of all 3% tax deductions with customer TIN numbers and voucher serials
+                </p>
+              </div>
+            </div>
+
+            {(!withheldSales || withheldSales.length === 0) ? (
+              <div className="empty-state">
+                <p>No sales with 3% Withholding Tax recorded yet.</p>
+                <p className="text-xs text-muted">When ringing up contractor orders over 20,000 ETB, check "Apply 3% Withholding Tax" in New Sale.</p>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Invoice #</th>
+                      <th>Client / Contractor</th>
+                      <th>Client TIN</th>
+                      <th>Voucher Serial</th>
+                      <th>Gross Billed</th>
+                      <th>3% WHT Deducted</th>
+                      <th>Net Collected</th>
+                      <th>Voucher Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {withheldSales.map(sale => {
+                      const dt = new Date(sale.timestamp);
+                      return (
+                        <tr key={sale.id}>
+                          <td>{dt.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                          <td><strong className="font-mono text-primary">{sale.id}</strong></td>
+                          <td><strong>{sale.customer}</strong></td>
+                          <td>{sale.customerTin ? <span className="font-mono">{sale.customerTin}</span> : <span className="text-muted">N/A</span>}</td>
+                          <td>{sale.whtVoucherNumber ? <span className="badge-pill badge-neutral font-mono">{sale.whtVoucherNumber}</span> : <span className="text-warning">Pending</span>}</td>
+                          <td>{formatCurrency(sale.grossTotal || sale.total)}</td>
+                          <td><strong className="text-danger">- {formatCurrency(sale.withholdingAmount)}</strong></td>
+                          <td><strong className="text-success">{formatCurrency(sale.netPayable)}</strong></td>
+                          <td>
+                            {sale.whtVoucherStatus === 'received' ? (
+                              <span className="badge-pill badge-healthy">✓ Received</span>
+                            ) : (
+                              <span className="badge-pill badge-warning">⏳ Pending Voucher</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
