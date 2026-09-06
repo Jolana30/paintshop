@@ -21,6 +21,7 @@ DROP TABLE IF EXISTS stock_movements CASCADE;
 DROP TABLE IF EXISTS shop_inventory CASCADE;
 DROP TABLE IF EXISTS master_products CASCADE;
 DROP TABLE IF EXISTS shops CASCADE;
+DROP TABLE IF EXISTS products CASCADE;
 
 -- 2. Shops (Tenants) Table
 CREATE TABLE shops (
