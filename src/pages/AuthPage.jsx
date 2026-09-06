@@ -7,7 +7,7 @@ import {
 } from '../components/Icons';
 
 export default function AuthPage() {
-  const { currentShop, loginShop, registerShop, approveShop, authError, clearAuthError } = useStock();
+  const { currentShop, loginShop, registerShop, approveShop, logoutShop, authError, clearAuthError } = useStock();
   const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register'
 
   // Login form state
@@ -25,6 +25,7 @@ export default function AuthPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [formMessage, setFormMessage] = useState(null);
+  const [emailConfirmationNotice, setEmailConfirmationNotice] = useState(null);
 
   // Quick Demo presets for testing
   const handleQuickDemoLogin = (shopType) => {
@@ -89,17 +90,52 @@ export default function AuthPage() {
 
     setIsLoading(false);
     if (res?.success) {
-      setFormMessage({
-        type: 'success',
-        text: 'Shop successfully registered! Your application is pending administrator activation.'
-      });
+      if (res.requireEmailConfirmation) {
+        setEmailConfirmationNotice(res.email);
+      } else {
+        setFormMessage({
+          type: 'success',
+          text: 'Shop successfully registered! Your application is pending administrator activation.'
+        });
+      }
     } else {
       setFormMessage({
         type: 'error',
-        text: res?.message || 'Registration could not be completed. Please try again.'
+        text: res?.message || authError || 'Registration could not be completed. Please try again.'
       });
     }
   };
+
+  // Show email confirmation holding view if user must verify inbox first
+  if (emailConfirmationNotice) {
+    return (
+      <div className="auth-fullscreen-container">
+        <div className="auth-approval-card">
+          <div className="approval-icon-wrapper" style={{ background: '#eff6ff', color: '#2563eb' }}>
+            <span className="approval-badge-icon">✉️</span>
+          </div>
+          <h2 className="approval-title">Verification Email Sent</h2>
+          <p className="approval-subtitle">
+            We sent an activation link to <strong>{emailConfirmationNotice}</strong>.
+          </p>
+          <p className="approval-note">
+            Please check your inbox (and spam folder) and click the verification link to confirm your account. After confirming, you can sign in to your paint shop portal.
+          </p>
+          <button
+            type="button"
+            className="btn-primary"
+            style={{ marginTop: '1.5rem', width: '100%' }}
+            onClick={() => {
+              setEmailConfirmationNotice(null);
+              setActiveTab('login');
+            }}
+          >
+            Return to Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // If a shop is registered but pending approval, show clean holding screen
   if (currentShop && currentShop.status === 'pending_approval') {
@@ -135,7 +171,7 @@ export default function AuthPage() {
             )}
             <div className="detail-row">
               <span className="detail-label">Status:</span>
-              <span className="badge-pill badge-warning">Pending Owner Approval</span>
+              <span className="badge-pill badge-warning">Pending Administrator Approval</span>
             </div>
           </div>
 
@@ -143,7 +179,7 @@ export default function AuthPage() {
             To ensure authorized dealer compliance, our SaaS administrator verifies every paint retailer branch before unlocking the live POS and stock registers.
           </p>
 
-          {/* Quick Demo Bypass for Testing */}
+          {/* Quick Demo Action for Testing / Local Environment */}
           <div className="admin-demo-approval-action">
             <button
               type="button"
@@ -152,6 +188,14 @@ export default function AuthPage() {
             >
               <CheckCircleIcon size={16} />
               <span>[Demo Admin Action] Approve & Unlock Store Now</span>
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ marginTop: '0.75rem', width: '100%', display: 'flex', justifyContent: 'center' }}
+              onClick={logoutShop}
+            >
+              Sign Out / Switch Branch
             </button>
           </div>
         </div>

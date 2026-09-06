@@ -1,8 +1,8 @@
 /**
  * PaintFlow - Supabase Client & Multi-Shop Connection Manager
- * Connects directly to Supabase Auth & PostgreSQL REST API.
- * Provides resilient multi-tenant CRUD, 3% Withholding Tax tracking,
- * and seamless offline/demo mode.
+ * Connects directly to Supabase Auth & PostgreSQL REST/RPC API.
+ * Provides resilient multi-tenant isolation, 3% Withholding Tax tracking,
+ * strict server-side transactional integrity, and seamless offline/demo mode.
  */
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').trim();
@@ -11,7 +11,8 @@ const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
 /**
- * Lightweight REST Client for Supabase PostgREST & Auth
+ * Lightweight REST & RPC Client for Supabase PostgREST & Auth.
+ * Throws on non-2xx responses so callers can reliably handle errors and rollbacks.
  */
 export async function fetchFromSupabase(endpoint, options = {}) {
   if (!isSupabaseConfigured) return null;
@@ -32,30 +33,48 @@ export async function fetchFromSupabase(endpoint, options = {}) {
     ...options.headers
   };
 
-  try {
-    const response = await fetch(url, { ...options, headers });
-    if (!response.ok) {
-      const errText = await response.text();
-      console.warn(`[Supabase API Error ${response.status}]`, errText);
-      try {
-        return { error: JSON.parse(errText) };
-      } catch {
-        return { error: { message: errText } };
+  const response = await fetch(url, { ...options, headers });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    let errMsg = `Supabase request failed with HTTP ${response.status}`;
+    try {
+      const parsed = JSON.parse(errText);
+      errMsg = parsed.message || parsed.error_description || parsed.msg || parsed.error || errMsg;
+    } catch {
+      if (errText && errText.trim()) {
+        errMsg = errText;
       }
     }
-
-    const text = await response.text();
-    if (!text || text.trim().length === 0) return true;
-    return JSON.parse(text);
-  } catch (err) {
-    console.error('[Supabase Network Failure]', err);
-    return null;
+    const error = new Error(errMsg);
+    error.status = response.status;
+    console.error(`[Supabase API Error ${response.status}]`, errMsg);
+    throw error;
   }
+
+  const text = await response.text();
+  if (!text || text.trim().length === 0) return true;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+/**
+ * Call a PostgreSQL Remote Procedure Call (RPC) function in Supabase
+ */
+export async function callRpc(functionName, params = {}) {
+  return fetchFromSupabase(`rpc/${functionName}`, {
+    method: 'POST',
+    body: JSON.stringify(params)
+  });
 }
 
 export const supabaseAuth = {
   /**
-   * Register a new Paint Shop account
+   * Register a new Paint Shop account.
+   * Shop profile creation is handled server-side via PostgreSQL trigger on auth.users.
    */
   async signUp({ email, password, shopName, ownerName, phone, cityAddress, tinNumber }) {
     if (!isSupabaseConfigured) {
@@ -84,35 +103,25 @@ export const supabaseAuth = {
           owner_name: ownerName,
           phone,
           city_address: cityAddress,
-          tin_number: tinNumber
+          tin_number: tinNumber || null
         }
       })
     });
 
-    if (res?.error) return { error: res.error };
+    // Check if email confirmation is required (user created without active session)
+    const requireEmailConfirmation = Boolean(res?.user && !res?.session);
 
-    // Also create shop record in public.shops
-    if (res?.user?.id) {
-      await fetchFromSupabase('shops', {
-        method: 'POST',
-        body: JSON.stringify({
-          id: res.user.id,
-          name: shopName,
-          owner_name: ownerName,
-          phone,
-          city_address: cityAddress,
-          tin_number: tinNumber || null,
-          email,
-          status: 'pending_approval'
-        })
-      });
-    }
-
-    return { data: res };
+    return {
+      data: res,
+      user: res?.user,
+      session: res?.session,
+      requireEmailConfirmation,
+      email
+    };
   },
 
   /**
-   * Sign in to existing shop account
+   * Sign in to existing shop account and fetch authoritative profile
    */
   async signIn({ email, password }) {
     if (!isSupabaseConfigured) return null;
@@ -127,14 +136,27 @@ export const supabaseAuth = {
       localStorage.setItem('paintflow_refresh_token', res.refresh_token);
     }
 
-    return res;
+    let profile = null;
+    if (res?.user?.id) {
+      try {
+        profile = await supabaseAuth.getShopProfile(res.user.id);
+      } catch (err) {
+        console.warn('Could not fetch shop profile after login:', err);
+      }
+    }
+
+    return {
+      user: res.user,
+      profile,
+      access_token: res.access_token
+    };
   },
 
   /**
-   * Fetch shop profile for the authenticated user
+   * Fetch shop profile for the authenticated user from public.shops
    */
   async getShopProfile(shopId) {
-    if (!isSupabaseConfigured) return null;
+    if (!isSupabaseConfigured || !shopId) return null;
     const res = await fetchFromSupabase(`shops?id=eq.${encodeURIComponent(shopId)}&select=*`);
     if (Array.isArray(res) && res.length > 0) return res[0];
     return null;
@@ -145,7 +167,11 @@ export const supabaseAuth = {
    */
   async signOut() {
     if (isSupabaseConfigured) {
-      await fetchFromSupabase('auth/v1/logout', { method: 'POST' });
+      try {
+        await fetchFromSupabase('auth/v1/logout', { method: 'POST' });
+      } catch (e) {
+        console.warn('Logout API warning:', e);
+      }
     }
     localStorage.removeItem('paintflow_auth_token');
     localStorage.removeItem('paintflow_refresh_token');
@@ -208,15 +234,69 @@ export const supabaseApi = {
   },
 
   /**
-   * Update stock count in shop inventory
+   * Atomic Transactional Sale Recording:
+   * Locks inventory rows, checks sufficient stock, decrements stock,
+   * inserts sale, items, and movements in a single atomic database transaction.
    */
-  async updateInventoryStock(shopId, inventoryItemId, newStock) {
-    return fetchFromSupabase(`shop_inventory?id=eq.${encodeURIComponent(inventoryItemId)}&shop_id=eq.${encodeURIComponent(shopId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        stock: newStock,
-        updated_at: new Date().toISOString()
-      })
+  async recordSale({ sale, items }) {
+    if (!isSupabaseConfigured) return true;
+
+    const saleRow = {
+      id: sale.id,
+      customer: sale.customer || 'Cash Walk-in',
+      customer_tin: sale.customerTin || null,
+      payment_type: sale.paymentType || 'Cash',
+      total: sale.total,
+      total_items: sale.totalItems,
+      is_withholding: Boolean(sale.isWithholding),
+      withholding_rate: sale.withholdingRate || 3.0,
+      withholding_amount: sale.withholdingAmount || 0,
+      net_payable: sale.netPayable !== undefined ? sale.netPayable : sale.total,
+      wht_voucher_number: sale.whtVoucherNumber || null,
+      wht_voucher_status: sale.whtVoucherStatus || (sale.isWithholding ? 'pending' : 'not_applicable'),
+      created_at: sale.timestamp || new Date().toISOString()
+    };
+
+    const itemRows = (items || []).map(item => ({
+      product_id: item.productId,
+      product_name: item.productName,
+      code: item.code,
+      size: item.size,
+      quantity: item.quantity,
+      unit_price: item.unitPrice,
+      price_before_vat: item.priceBeforeVat || 0,
+      subtotal: item.subtotal
+    }));
+
+    return callRpc('record_sale_transaction', {
+      p_sale: saleRow,
+      p_items: itemRows
+    });
+  },
+
+  /**
+   * Atomic Transactional Stock In:
+   * Increments stock with row lock and logs audit movement in one transaction.
+   */
+  async recordStockIn(productId, quantity, reference = 'Supplier Stock Receipt') {
+    if (!isSupabaseConfigured) return true;
+    return callRpc('record_stock_in_transaction', {
+      p_product_id: productId,
+      p_quantity: parseInt(quantity, 10),
+      p_reference: reference
+    });
+  },
+
+  /**
+   * Atomic Transactional Stock Adjustment:
+   * Adjusts stock count with row lock and logs audit movement in one transaction.
+   */
+  async adjustStock(productId, newStock, reason = 'Physical Stock Count') {
+    if (!isSupabaseConfigured) return true;
+    return callRpc('adjust_stock_transaction', {
+      p_product_id: productId,
+      p_new_stock: parseInt(newStock, 10),
+      p_reason: reason
     });
   },
 
@@ -234,86 +314,13 @@ export const supabaseApi = {
   },
 
   /**
-   * Complete Sale Transaction with 3% Withholding Tax Support
-   */
-  async recordSale({ shopId, sale, items, movements, productUpdates }) {
-    if (!isSupabaseConfigured) return false;
-
-    try {
-      const saleRow = {
-        id: sale.id,
-        shop_id: shopId,
-        customer: sale.customer || 'Cash Walk-in',
-        customer_tin: sale.customerTin || null,
-        payment_type: sale.paymentType || 'Cash',
-        total: sale.total,
-        total_items: sale.totalItems,
-        is_withholding: Boolean(sale.isWithholding),
-        withholding_rate: sale.withholdingRate || 3.0,
-        withholding_amount: sale.withholdingAmount || 0,
-        net_payable: sale.netPayable !== undefined ? sale.netPayable : sale.total,
-        wht_voucher_number: sale.whtVoucherNumber || null,
-        wht_voucher_status: sale.whtVoucherStatus || (sale.isWithholding ? 'pending' : 'not_applicable'),
-        created_at: sale.timestamp || new Date().toISOString()
-      };
-
-      await fetchFromSupabase('sales', {
-        method: 'POST',
-        body: JSON.stringify(saleRow)
-      });
-
-      if (items && items.length > 0) {
-        const itemRows = items.map(item => ({
-          sale_id: sale.id,
-          shop_id: shopId,
-          product_id: item.productId,
-          product_name: item.productName,
-          code: item.code,
-          size: item.size,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          price_before_vat: item.priceBeforeVat || 0,
-          subtotal: item.subtotal,
-          created_at: sale.timestamp || new Date().toISOString()
-        }));
-
-        await fetchFromSupabase('sale_items', {
-          method: 'POST',
-          body: JSON.stringify(itemRows)
-        });
-      }
-
-      if (movements && movements.length > 0) {
-        const movRows = movements.map(m => ({
-          id: m.id,
-          shop_id: shopId,
-          product_id: m.productId,
-          product_name: m.productName,
-          type: 'SALE',
-          quantity: m.quantity,
-          previous_stock: m.previousStock,
-          new_stock: m.newStock,
-          reference: sale.id,
-          created_at: m.timestamp || new Date().toISOString()
-        }));
-
-        await fetchFromSupabase('stock_movements', {
-          method: 'POST',
-          body: JSON.stringify(movRows)
-        });
-      }
-
-      return true;
-    } catch (err) {
-      console.error('[Supabase recordSale error]', err);
-      return false;
-    }
-  },
-
-  /**
-   * Super Admin method: Update shop status (approve / suspend)
+   * Super Admin approval: Calls secure server RPC to approve and activate shop
    */
   async updateShopStatus(shopId, status) {
+    if (!isSupabaseConfigured) return true;
+    if (status === 'active') {
+      return callRpc('admin_approve_shop', { target_shop_id: shopId });
+    }
     return fetchFromSupabase(`shops?id=eq.${encodeURIComponent(shopId)}`, {
       method: 'PATCH',
       body: JSON.stringify({

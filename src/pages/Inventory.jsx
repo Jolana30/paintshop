@@ -33,11 +33,11 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
   const [customStock, setCustomStock] = useState('10');
   const [customMinStock, setCustomMinStock] = useState('3');
 
-  const handleCreateCustomProduct = (e) => {
+  const handleCreateCustomProduct = async (e) => {
     e.preventDefault();
     if (!customName.trim() || !customPrice) return;
 
-    addCustomProduct({
+    await addCustomProduct({
       name: customName.trim(),
       category: customCategory,
       size: customSize.trim() || '1 Unit',
@@ -104,16 +104,23 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
     setEditQty(product.stock);
   };
 
-  const handleSaveStock = (e) => {
+  const [isSavingStock, setIsSavingStock] = useState(false);
+
+  const handleSaveStock = async (e) => {
     e.preventDefault();
-    if (!editingProduct) return;
+    if (!editingProduct || isSavingStock) return;
     const val = parseInt(editQty, 10);
     if (isNaN(val) || val < 0) {
       alert('Please enter a valid stock quantity (0 or greater).');
       return;
     }
-    processStockAdjustment(editingProduct.id, val, 'Quick Stock Update');
-    setEditingProduct(null);
+    setIsSavingStock(true);
+    try {
+      await processStockAdjustment(editingProduct.id, val, 'Quick Stock Update');
+      setEditingProduct(null);
+    } finally {
+      setIsSavingStock(false);
+    }
   };
 
   const quickAdjustQty = (delta) => {

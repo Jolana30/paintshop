@@ -213,35 +213,43 @@ export default function NewSale({ setActiveTab }) {
   const cartWhtAmount = isWithholding ? Math.round((cartGrossTotal * 0.03) * 100) / 100 : 0;
   const cartNetPayable = isWithholding ? (cartGrossTotal - cartWhtAmount) : cartGrossTotal;
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Record Sale and immediately show it in Sales History
-  const handleRecordSale = (e) => {
+  const handleRecordSale = async (e) => {
     if (e) e.preventDefault();
     if (cart.length === 0) {
       alert("Please add at least 1 product to the sale.");
       return;
     }
+    if (isSubmitting) return;
 
-    const completed = processSale(cart, paymentType, {
-      isWithholding,
-      withholdingRate: 3.0,
-      withholdingAmount: cartWhtAmount,
-      netPayable: cartNetPayable,
-      customerName: customerName.trim() || (isWithholding ? 'Corporate Contractor' : 'Cash Walk-in'),
-      customerTin: customerTin.trim(),
-      whtVoucherNumber: whtVoucherNumber.trim(),
-      whtVoucherStatus: isWithholding ? whtVoucherStatus : 'not_applicable'
-    });
+    setIsSubmitting(true);
+    try {
+      const completed = await processSale(cart, paymentType, {
+        isWithholding,
+        withholdingRate: 3.0,
+        withholdingAmount: cartWhtAmount,
+        netPayable: cartNetPayable,
+        customerName: customerName.trim() || (isWithholding ? 'Corporate Contractor' : 'Cash Walk-in'),
+        customerTin: customerTin.trim(),
+        whtVoucherNumber: whtVoucherNumber.trim(),
+        whtVoucherStatus: isWithholding ? whtVoucherStatus : 'not_applicable'
+      });
 
-    if (completed) {
-      setCart([]);
-      setPaymentType('Cash');
-      setIsWithholding(false);
-      setCustomerName('');
-      setCustomerTin('');
-      setWhtVoucherNumber('');
-      setWhtVoucherStatus('pending');
-      setIsMobileCartOpen(false);
-      setActiveTab('sales');
+      if (completed) {
+        setCart([]);
+        setPaymentType('Cash');
+        setIsWithholding(false);
+        setCustomerName('');
+        setCustomerTin('');
+        setWhtVoucherNumber('');
+        setWhtVoucherStatus('pending');
+        setIsMobileCartOpen(false);
+        setActiveTab('sales');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

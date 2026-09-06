@@ -19,6 +19,18 @@ export const getLocalDateString = (d = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
+// Robust collision-proof UUID generator
+export const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 // Pre-seeded Demo Shops for immediate evaluation
 const DEFAULT_DEMO_SHOPS = [
   {
@@ -44,7 +56,7 @@ const DEFAULT_DEMO_SHOPS = [
 ];
 
 export function StockProvider({ children }) {
-  const [cloudStatus, setCloudStatus] = useState('checking'); // 'connected' | 'offline' | 'checking'
+  const [cloudStatus, setCloudStatus] = useState(isSupabaseConfigured ? 'connected' : 'offline');
   const [toast, setToast] = useState(null);
   const [authError, setAuthError] = useState(null);
 
@@ -59,7 +71,7 @@ export function StockProvider({ children }) {
     if (saved) {
       try { return JSON.parse(saved); } catch { /* ignore */ }
     }
-    // Default to the first active demo shop for immediate convenience
+    // Default to first demo shop in offline mode
     return DEFAULT_DEMO_SHOPS[0];
   });
 
@@ -131,17 +143,16 @@ export function StockProvider({ children }) {
     setToast({ message, type });
     setTimeout(() => {
       setToast(null);
-    }, 3500);
+    }, 4000);
   };
 
-  // 5. Auth Handlers
+  // 5. Authentication Handlers
   const loginShop = async (email, password, mockShopOverride = null) => {
     setAuthError(null);
 
-    // If mock override passed from preset buttons
+    // Mock override passed from preset buttons
     if (mockShopOverride) {
       setCurrentShop(mockShopOverride);
-      // Ensure it is in allShops
       setAllShops(prev => {
         const exists = prev.find(s => s.id === mockShopOverride.id);
         return exists ? prev : [mockShopOverride, ...prev];
@@ -150,65 +161,56 @@ export function StockProvider({ children }) {
       return true;
     }
 
-    // Try finding in local mock shops first
-    const foundLocal = allShops.find(s => s.email.toLowerCase() === email.toLowerCase());
-    if (foundLocal) {
-      setCurrentShop(foundLocal);
-      showToast(`Welcome back, ${foundLocal.name}!`, 'success');
-      return true;
-    }
-
-    // Attempt Supabase Cloud auth
+    // Try cloud authentication if configured
     if (isSupabaseConfigured) {
-      const res = await supabaseAuth.signIn({ email, password });
-      if (res?.user) {
-        const profile = await supabaseAuth.getShopProfile(res.user.id);
-        const shopObj = profile || {
-          id: res.user.id,
-          name: res.user.user_metadata?.shop_name || 'My Jotun Store',
-          email,
-          phone: res.user.user_metadata?.phone || '',
-          city_address: res.user.user_metadata?.city_address || '',
-          tin_number: res.user.user_metadata?.tin_number || '',
-          status: 'active'
-        };
-        setCurrentShop(shopObj);
-        setAllShops(prev => [shopObj, ...prev.filter(s => s.id !== shopObj.id)]);
-        showToast(`Signed in to ${shopObj.name}!`, 'success');
-        return true;
-      } else if (res?.error) {
-        setAuthError(res.error.message || 'Invalid login credentials.');
+      try {
+        const res = await supabaseAuth.signIn({ email, password });
+        if (res?.user) {
+          const profile = res.profile || {
+            id: res.user.id,
+            name: res.user.user_metadata?.shop_name || 'My Jotun Store',
+            email,
+            phone: res.user.user_metadata?.phone || '',
+            city_address: res.user.user_metadata?.city_address || '',
+            tin_number: res.user.user_metadata?.tin_number || '',
+            status: 'pending_approval' // Enforce pending status until explicitly active!
+          };
+
+          setCurrentShop(profile);
+          setAllShops(prev => [profile, ...prev.filter(s => s.id !== profile.id)]);
+
+          if (profile.status === 'active') {
+            showToast(`Welcome back, ${profile.name}!`, 'success');
+          } else {
+            showToast(`Signed in. Store application is pending review.`, 'info');
+          }
+          return true;
+        }
+      } catch (err) {
+        console.error('Login error:', err);
+        setAuthError(err.message || 'Invalid login credentials.');
         return false;
+      }
+    } else {
+      // Local demo shop lookup
+      const foundLocal = allShops.find(s => s.email.toLowerCase() === email.toLowerCase());
+      if (foundLocal) {
+        setCurrentShop(foundLocal);
+        showToast(`Welcome back, ${foundLocal.name}!`, 'success');
+        return true;
       }
     }
 
-    setAuthError('Shop account not found. Please check your email or register your shop.');
+    setAuthError('Shop account not found. Please check your credentials or register.');
     return false;
   };
 
   const registerShop = async ({ shopName, ownerName, phone, cityAddress, tinNumber, email, password }) => {
     setAuthError(null);
-    const newShopId = 'shop-' + Date.now();
-    const newShop = {
-      id: newShopId,
-      name: shopName,
-      owner_name: ownerName,
-      phone,
-      city_address: cityAddress,
-      tin_number: tinNumber,
-      email,
-      status: 'pending_approval', // Owner approval workflow!
-      created_at: new Date().toISOString()
-    };
 
-    // Save to local registry
-    setAllShops(prev => [newShop, ...prev]);
-    setCurrentShop(newShop);
-
-    // Try cloud registration if connected
     if (isSupabaseConfigured) {
       try {
-        await supabaseAuth.signUp({
+        const res = await supabaseAuth.signUp({
           email,
           password,
           shopName,
@@ -217,26 +219,86 @@ export function StockProvider({ children }) {
           cityAddress,
           tinNumber
         });
-      } catch (err) {
-        console.warn('Notice: Registered locally; cloud sync pending.', err);
-      }
-    }
 
-    showToast(`Registered ${shopName}! Pending owner approval.`, 'info');
-    return { success: true };
+        if (res.requireEmailConfirmation) {
+          return {
+            success: true,
+            requireEmailConfirmation: true,
+            email: res.email,
+            message: 'Account created! Please check your email to confirm your registration.'
+          };
+        }
+
+        const newShop = {
+          id: res.user?.id || ('shop-' + Date.now()),
+          name: shopName,
+          owner_name: ownerName,
+          phone,
+          city_address: cityAddress,
+          tin_number: tinNumber || '',
+          email,
+          status: 'pending_approval',
+          created_at: new Date().toISOString()
+        };
+
+        setAllShops(prev => [newShop, ...prev.filter(s => s.id !== newShop.id)]);
+        setCurrentShop(newShop);
+        showToast(`Store registered! Pending administrator approval.`, 'info');
+
+        return {
+          success: true,
+          requireEmailConfirmation: false,
+          shop: newShop
+        };
+      } catch (err) {
+        console.error('Registration failed:', err);
+        setAuthError(err.message || 'Registration failed. Please try again.');
+        return {
+          success: false,
+          message: err.message || 'Registration failed.'
+        };
+      }
+    } else {
+      // Local demo mode registration
+      const newShopId = 'shop-' + Date.now();
+      const newShop = {
+        id: newShopId,
+        name: shopName,
+        owner_name: ownerName,
+        phone,
+        city_address: cityAddress,
+        tin_number: tinNumber,
+        email,
+        status: 'pending_approval',
+        created_at: new Date().toISOString()
+      };
+
+      setAllShops(prev => [newShop, ...prev]);
+      setCurrentShop(newShop);
+      showToast(`Registered ${shopName}! Pending approval.`, 'info');
+      return { success: true, requireEmailConfirmation: false, shop: newShop };
+    }
   };
 
-  // Super Admin Approval Demo Action
+  // Administrative Approval Workflow
   const approveShop = async (targetShopId) => {
-    const updated = allShops.map(s => s.id === targetShopId ? { ...s, status: 'active' } : s);
-    setAllShops(updated);
-    if (currentShop && currentShop.id === targetShopId) {
-      setCurrentShop({ ...currentShop, status: 'active' });
+    try {
+      if (isSupabaseConfigured) {
+        await supabaseApi.updateShopStatus(targetShopId, 'active');
+      }
+
+      const updated = allShops.map(s => s.id === targetShopId ? { ...s, status: 'active' } : s);
+      setAllShops(updated);
+      if (currentShop && currentShop.id === targetShopId) {
+        setCurrentShop(prev => ({ ...prev, status: 'active' }));
+      }
+      showToast("Shop successfully approved and activated!", "success");
+      return true;
+    } catch (err) {
+      console.error('Failed to approve shop:', err);
+      showToast(`Approval failed: ${err.message}`, 'error');
+      return false;
     }
-    if (isSupabaseConfigured) {
-      await supabaseApi.updateShopStatus(targetShopId, 'active');
-    }
-    showToast("Shop approved and activated successfully!", "success");
   };
 
   const logoutShop = () => {
@@ -246,7 +308,7 @@ export function StockProvider({ children }) {
   };
 
   // 6. Custom Product Creation (Brushes, Rollers, Local Putty)
-  const addCustomProduct = (customProduct) => {
+  const addCustomProduct = async (customProduct) => {
     const newId = `custom-${Date.now()}`;
     const priceWithVat = parseFloat(customProduct.priceWithVat) || 0;
     const priceBeforeVat = customProduct.priceBeforeVat !== undefined
@@ -266,23 +328,26 @@ export function StockProvider({ children }) {
       isCustom: true
     };
 
-    setProducts(prev => [newItem, ...prev]);
-
     if (isSupabaseConfigured && currentShop) {
-      supabaseApi.addCustomProduct(currentShop.id, newItem).catch(err => {
+      try {
+        await supabaseApi.addCustomProduct(currentShop.id, newItem);
+      } catch (err) {
         console.error('Failed to sync custom item to cloud:', err);
-      });
+        showToast(`Warning: Failed to save product to cloud: ${err.message}`, 'error');
+        return null;
+      }
     }
 
+    setProducts(prev => [newItem, ...prev]);
     showToast(`Added custom product: ${newItem.name}!`, 'success');
     return newItem;
   };
 
-  // 7. Complete Sale with Ethiopian 3% Withholding Tax
-  const processSale = (cartItems, paymentType = "Cash", withholdingDetails = null) => {
+  // 7. Atomic Transactional Sale with 3% Withholding Tax
+  const processSale = async (cartItems, paymentType = "Cash", withholdingDetails = null) => {
     if (!cartItems || cartItems.length === 0) return false;
 
-    // Check available stock
+    // Check available stock locally first
     for (const item of cartItems) {
       const prod = products.find(p => p.id === item.productId);
       if (!prod) {
@@ -290,17 +355,16 @@ export function StockProvider({ children }) {
         return false;
       }
       if (prod.stock < item.quantity) {
-        showToast(`Insufficient stock for ${prod.name}! Only ${prod.stock} units available.`, 'error');
+        showToast(`Insufficient stock for ${prod.name}! Available: ${prod.stock}, Requested: ${item.quantity}`, 'error');
         return false;
       }
     }
 
-    const saleId = `SALE-${Math.floor(1000 + Math.random() * 9000)}`;
+    const saleId = 'SALE-' + generateUUID();
     const now = new Date().toISOString();
     const newMovements = [];
-    const productUpdates = [];
 
-    // Deduct stock
+    // Prepare updated products and movement records
     const updatedProducts = products.map(p => {
       const inCart = cartItems.find(item => item.productId === p.id);
       if (inCart) {
@@ -308,7 +372,7 @@ export function StockProvider({ children }) {
         const next = p.stock - inCart.quantity;
 
         newMovements.push({
-          id: `MOV-${Date.now()}-${p.id}-${Math.floor(Math.random() * 1000)}`,
+          id: 'MOV-' + generateUUID(),
           productId: p.id,
           productName: p.name,
           type: 'SALE',
@@ -319,7 +383,6 @@ export function StockProvider({ children }) {
           timestamp: now
         });
 
-        productUpdates.push({ id: p.id, stock: next });
         return { ...p, stock: next };
       }
       return p;
@@ -329,10 +392,9 @@ export function StockProvider({ children }) {
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     const finalPayment = paymentType || "Cash";
 
-    // Calculate 3% Withholding Tax if applied
+    // Ethiopian 3% Withholding Tax computation
     const isWht = Boolean(withholdingDetails?.isWithholding);
-    const whtRate = 3.0; // Official Ethiopian tax rate on goods
-    // In Ethiopia, 3% WHT is computed on the total taxable supply
+    const whtRate = 3.0;
     const whtAmount = isWht ? Math.round((grossTotal * (whtRate / 100)) * 100) / 100 : 0;
     const netPayable = isWht ? (grossTotal - whtAmount) : grossTotal;
 
@@ -342,12 +404,12 @@ export function StockProvider({ children }) {
       localDate: getLocalDateString(now),
       items: cartItems,
       totalItems,
-      total: grossTotal, // Gross Invoice total
+      total: grossTotal,
       grossTotal,
       isWithholding: isWht,
       withholdingRate: whtRate,
       withholdingAmount: whtAmount,
-      netPayable, // Actual cash/bank amount collected
+      netPayable,
       customer: withholdingDetails?.customerName || (isWht ? 'Corporate Client' : 'Cash Walk-in'),
       customerTin: withholdingDetails?.customerTin || null,
       whtVoucherNumber: withholdingDetails?.whtVoucherNumber || null,
@@ -357,33 +419,50 @@ export function StockProvider({ children }) {
       shopName: currentShop?.name
     };
 
-    // Optimistic state updates
+    // Execute Atomic Database Transaction via Supabase RPC
+    if (isSupabaseConfigured && currentShop?.id) {
+      try {
+        await supabaseApi.recordSale({
+          sale: newSale,
+          items: cartItems
+        });
+      } catch (err) {
+        console.error('[Sale Transaction Failed]', err);
+        showToast(`Transaction failed: ${err.message}`, 'error');
+        // Do not update local state on failure!
+        return false;
+      }
+    }
+
+    // Apply state upon confirmed transaction
     setProducts(updatedProducts);
     setSales(prevSales => [newSale, ...prevSales]);
     setMovements(prevMovements => [...newMovements, ...prevMovements]);
 
-    // Asynchronous Cloud Database Sync
-    if (isSupabaseConfigured && currentShop?.id) {
-      supabaseApi.recordSale({
-        shopId: currentShop.id,
-        sale: newSale,
-        items: cartItems,
-        movements: newMovements,
-        productUpdates
-      }).catch(err => console.error('Cloud Sync Error:', err));
-    }
-
     if (isWht) {
-      showToast(`Sale #${saleId} recorded! Net collected: ${formatCurrency(netPayable)} (3% WHT: -${formatCurrency(whtAmount)})`, 'success');
+      showToast(`Sale #${saleId.slice(-8)} recorded! Net collected: ${formatCurrency(netPayable)} (3% WHT: -${formatCurrency(whtAmount)})`, 'success');
     } else {
-      showToast(`Sale #${saleId} recorded! ${totalItems} unit(s) deducted from stock.`, 'success');
+      showToast(`Sale #${saleId.slice(-8)} recorded! ${totalItems} unit(s) deducted from stock.`, 'success');
     }
 
     return newSale;
   };
 
   // Update Withholding Voucher Number or Status
-  const updateSaleWhtVoucher = (saleId, voucherNumber, voucherStatus) => {
+  const updateSaleWhtVoucher = async (saleId, voucherNumber, voucherStatus) => {
+    if (isSupabaseConfigured) {
+      try {
+        await supabaseApi.updateSaleWhtVoucher(saleId, {
+          voucherNumber,
+          voucherStatus
+        });
+      } catch (err) {
+        console.error('Failed to update WHT voucher:', err);
+        showToast(`Failed to update voucher: ${err.message}`, 'error');
+        return false;
+      }
+    }
+
     setSales(prevSales => prevSales.map(s => {
       if (s.id === saleId) {
         return {
@@ -395,18 +474,12 @@ export function StockProvider({ children }) {
       return s;
     }));
 
-    if (isSupabaseConfigured) {
-      supabaseApi.updateSaleWhtVoucher(saleId, {
-        voucherNumber,
-        voucherStatus
-      }).catch(err => console.error('Failed to update WHT voucher:', err));
-    }
-
     showToast("Withholding voucher details updated!", "success");
+    return true;
   };
 
-  // Stock In & Adjustments
-  const processStockIn = (productId, quantity, reference = "") => {
+  // Atomic Stock In
+  const processStockIn = async (productId, quantity, reference = "") => {
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || qty <= 0) {
       showToast("Please enter a valid stock quantity greater than 0.", "error");
@@ -419,6 +492,19 @@ export function StockProvider({ children }) {
       return false;
     }
 
+    const refText = reference.trim() || "Supplier Stock Receipt";
+
+    // Execute atomic server update
+    if (isSupabaseConfigured && currentShop?.id) {
+      try {
+        await supabaseApi.recordStockIn(productId, qty, refText);
+      } catch (err) {
+        console.error('[Stock In Failed]', err);
+        showToast(`Stock-in failed: ${err.message}`, 'error');
+        return false;
+      }
+    }
+
     const prev = targetProduct.stock;
     const next = prev + qty;
     const now = new Date().toISOString();
@@ -428,25 +514,26 @@ export function StockProvider({ children }) {
     );
 
     const newMovement = {
-      id: `MOV-${Date.now()}-${productId}`,
+      id: 'MOV-' + generateUUID(),
       productId: targetProduct.id,
       productName: targetProduct.name,
       type: 'STOCK_IN',
       quantity: qty,
       previousStock: prev,
       newStock: next,
-      reference: reference.trim() || "Supplier Stock Receipt",
+      reference: refText,
       timestamp: now
     };
 
     setProducts(updatedProducts);
     setMovements(prev => [newMovement, ...prev]);
 
-    showToast(`Stock updated: ${targetProduct.name} (+${qty} units)`, 'success');
+    showToast(`Stock received: ${targetProduct.name} (+${qty} units)`, 'success');
     return true;
   };
 
-  const processStockAdjustment = (productId, newStockQty, reason = "Inventory Count Adjustment") => {
+  // Atomic Stock Adjustment
+  const processStockAdjustment = async (productId, newStockQty, reason = "Inventory Count Adjustment") => {
     const next = parseInt(newStockQty, 10);
     if (isNaN(next) || next < 0) {
       showToast("Invalid stock amount.", "error");
@@ -455,6 +542,19 @@ export function StockProvider({ children }) {
 
     const targetProduct = products.find(p => p.id === productId);
     if (!targetProduct) return false;
+
+    const reasonText = reason.trim() || "Physical Stock Count";
+
+    // Execute atomic server adjustment
+    if (isSupabaseConfigured && currentShop?.id) {
+      try {
+        await supabaseApi.adjustStock(productId, next, reasonText);
+      } catch (err) {
+        console.error('[Stock Adjustment Failed]', err);
+        showToast(`Stock adjustment failed: ${err.message}`, 'error');
+        return false;
+      }
+    }
 
     const prev = targetProduct.stock;
     const diff = next - prev;
@@ -465,14 +565,14 @@ export function StockProvider({ children }) {
     );
 
     const newMovement = {
-      id: `MOV-${Date.now()}-${productId}`,
+      id: 'MOV-' + generateUUID(),
       productId: targetProduct.id,
       productName: targetProduct.name,
       type: 'ADJUSTMENT',
       quantity: diff,
       previousStock: prev,
       newStock: next,
-      reference: reason.trim() || "Physical Stock Count",
+      reference: reasonText,
       timestamp: now
     };
 

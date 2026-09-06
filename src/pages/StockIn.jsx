@@ -28,18 +28,25 @@ export default function StockIn({ preselectedProductId, setActiveTab }) {
   const currentStock = selectedProduct ? selectedProduct.stock : 0;
   const projectedStock = currentStock + (parsedQty > 0 ? parsedQty : 0);
 
-  const handleSubmit = (e) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedProduct) return;
+    if (!selectedProduct || isSubmitting) return;
     if (parsedQty <= 0) {
       alert("Please enter a valid quantity received greater than 0");
       return;
     }
 
-    const success = processStockIn(selectedProduct.id, parsedQty, reference);
-    if (success) {
-      setQuantity('');
-      setReference('');
+    setIsSubmitting(true);
+    try {
+      const success = await processStockIn(selectedProduct.id, parsedQty, reference);
+      if (success) {
+        setQuantity('');
+        setReference('');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
