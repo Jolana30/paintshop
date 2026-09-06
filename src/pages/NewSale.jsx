@@ -8,7 +8,6 @@ import {
   ShoppingCartIcon,
   CheckCircleIcon,
   RefreshCwIcon,
-  AlertTriangleIcon,
   PackageIcon
 } from '../components/Icons';
 
@@ -23,7 +22,6 @@ export default function NewSale({ setActiveTab }) {
 
   // Ethiopian 3% Withholding Tax (WHT) State
   const [isWithholding, setIsWithholding] = useState(false);
-  const [showWhtThresholdModal, setShowWhtThresholdModal] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [customerTin, setCustomerTin] = useState('');
   const [whtVoucherNumber, setWhtVoucherNumber] = useState('');
@@ -227,20 +225,6 @@ export default function NewSale({ setActiveTab }) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Triggered when user attempts to toggle WHT
-  const handleWhtToggleAttempt = (e) => {
-    if (!isWhtEligible) {
-      if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-      setShowWhtThresholdModal(true);
-      showToast(`3% Withholding Tax requires a minimum transaction value of 20,000 ETB. Current total: ${formatCurrency(cartGrossTotal)}.`, 'warning');
-      return;
-    }
-    setIsWithholding(prev => !prev);
-  };
-
   // Record Sale and immediately show it in Sales History
   const handleRecordSale = async (e) => {
     if (e) e.preventDefault();
@@ -251,7 +235,6 @@ export default function NewSale({ setActiveTab }) {
     if (isSubmitting) return;
 
     if (isWithholding && !isWhtEligible) {
-      setShowWhtThresholdModal(true);
       showToast(`Withholding tax requires a minimum transaction value of 20,000 ETB. Current total is ${formatCurrency(cartGrossTotal)}.`, 'warning');
       return;
     }
@@ -608,116 +591,81 @@ export default function NewSale({ setActiveTab }) {
                   </div>
                 </div>
 
-                {/* Ethiopian 3% Withholding Tax (WHT) Section */}
-                <div className="wht-checkout-box mb-3">
-                  <div className="wht-toggle-header">
-                    <label
-                      className="wht-checkbox-label"
-                      onClick={handleWhtToggleAttempt}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isWithholding && isWhtEligible}
-                        onChange={handleWhtToggleAttempt}
-                        onClick={(e) => {
-                          if (!isWhtEligible) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setShowWhtThresholdModal(true);
-                          }
-                        }}
-                      />
-                      <span className="wht-toggle-title">Apply 3% Withholding Tax (WHT)</span>
-                    </label>
-                    {isWhtEligible && !isWithholding && (
-                      <span className="badge-wht-hint">💡 Over 20k ETB (Eligible for 3% WHT)</span>
-                    )}
-                    {!isWhtEligible && (
-                      <button
-                        type="button"
-                        className="badge-wht-hint"
-                        style={{
-                          cursor: 'pointer',
-                          background: '#fef3c7',
-                          color: '#92400e',
-                          border: '1px solid #fde68a',
-                          padding: '2px 8px',
-                          borderRadius: '12px',
-                          fontSize: '11px',
-                          fontWeight: '600'
-                        }}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setShowWhtThresholdModal(true);
-                          showToast(`3% Withholding Tax requires a minimum transaction value of 20,000 ETB. Current total: ${formatCurrency(cartGrossTotal)}.`, 'warning');
-                        }}
-                        title="Click to view Ethiopian Withholding Tax rules"
-                      >
-                        ⚠️ Min. 20,000 ETB
-                      </button>
+                {/* Ethiopian 3% Withholding Tax (WHT) Section - Appears only if total is past 20,000 ETB */}
+                {isWhtEligible && (
+                  <div className="wht-checkout-box mb-3">
+                    <div className="wht-toggle-header">
+                      <label className="wht-checkbox-label" style={{ cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={isWithholding}
+                          onChange={(e) => setIsWithholding(e.target.checked)}
+                        />
+                        <span className="wht-toggle-title">Apply 3% Withholding Tax (WHT)</span>
+                      </label>
+                      <span className="badge-wht-hint">💡 Eligible (Over 20k ETB)</span>
+                    </div>
+
+                    {isWithholding && (
+                      <div className="wht-fields-container">
+                        <div className="form-group mb-2">
+                          <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Client / Company Name *</label>
+                          <input
+                            type="text"
+                            required={isWithholding}
+                            placeholder="e.g. Sunshine Construction PLC"
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                            className="form-input form-input-sm"
+                          />
+                        </div>
+
+                        <div className="form-grid-2 mb-2">
+                          <div>
+                            <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Customer TIN (10-digits)</label>
+                            <input
+                              type="text"
+                              placeholder="0012345678"
+                              value={customerTin}
+                              onChange={(e) => setCustomerTin(e.target.value)}
+                              className="form-input form-input-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>WHT Voucher Serial #</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. WHT-9481"
+                              value={whtVoucherNumber}
+                              onChange={(e) => setWhtVoucherNumber(e.target.value)}
+                              className="form-input form-input-sm"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="wht-status-pill-group">
+                          <span className="text-xs text-muted">Voucher Status:</span>
+                          <div className="pill-options">
+                            <button
+                              type="button"
+                              className={`wht-status-chip ${whtVoucherStatus === 'received' ? 'active-success' : ''}`}
+                              onClick={() => setWhtVoucherStatus('received')}
+                            >
+                              ✓ Voucher In Hand
+                            </button>
+                            <button
+                              type="button"
+                              className={`wht-status-chip ${whtVoucherStatus === 'pending' ? 'active-warning' : ''}`}
+                              onClick={() => setWhtVoucherStatus('pending')}
+                            >
+                              ⏳ Pending Collection
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
-
-                  {isWithholding && isWhtEligible && (
-                    <div className="wht-fields-container">
-                      <div className="form-group mb-2">
-                        <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Client / Company Name *</label>
-                        <input
-                          type="text"
-                          required={isWithholding}
-                          placeholder="e.g. Sunshine Construction PLC"
-                          value={customerName}
-                          onChange={(e) => setCustomerName(e.target.value)}
-                          className="form-input form-input-sm"
-                        />
-                      </div>
-
-                      <div className="form-grid-2 mb-2">
-                        <div>
-                          <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Customer TIN (10-digits)</label>
-                          <input
-                            type="text"
-                            placeholder="0012345678"
-                            value={customerTin}
-                            onChange={(e) => setCustomerTin(e.target.value)}
-                            className="form-input form-input-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>WHT Voucher Serial #</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. WHT-9481"
-                            value={whtVoucherNumber}
-                            onChange={(e) => setWhtVoucherNumber(e.target.value)}
-                            className="form-input form-input-sm"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="wht-status-pill-group">
-                        <span className="text-xs text-muted">Voucher Status:</span>
-                        <div className="pill-options">
-                          <button
-                            type="button"
-                            className={`wht-status-chip ${whtVoucherStatus === 'received' ? 'active-success' : ''}`}
-                            onClick={() => setWhtVoucherStatus('received')}
-                          >
-                            ✓ Voucher In Hand
-                          </button>
-                          <button
-                            type="button"
-                            className={`wht-status-chip ${whtVoucherStatus === 'pending' ? 'active-warning' : ''}`}
-                            onClick={() => setWhtVoucherStatus('pending')}
-                          >
-                            ⏳ Pending Collection
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )}
 
                 <div className="cart-financials">
                   <div className="financial-row">
@@ -929,116 +877,81 @@ export default function NewSale({ setActiveTab }) {
                 </div>
               </div>
 
-              {/* Ethiopian 3% Withholding Tax (WHT) Section in Mobile Drawer */}
-              <div className="wht-checkout-box mb-3">
-                <div className="wht-toggle-header">
-                  <label
-                    className="wht-checkbox-label"
-                    onClick={handleWhtToggleAttempt}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isWithholding && isWhtEligible}
-                      onChange={handleWhtToggleAttempt}
-                      onClick={(e) => {
-                        if (!isWhtEligible) {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowWhtThresholdModal(true);
-                        }
-                      }}
-                    />
-                    <span className="wht-toggle-title">Apply 3% Withholding Tax (WHT)</span>
-                  </label>
-                  {isWhtEligible && !isWithholding && (
-                    <span className="badge-wht-hint">💡 Over 20k ETB (Eligible for 3% WHT)</span>
-                  )}
-                  {!isWhtEligible && (
-                    <button
-                      type="button"
-                      className="badge-wht-hint"
-                      style={{
-                        cursor: 'pointer',
-                        background: '#fef3c7',
-                        color: '#92400e',
-                        border: '1px solid #fde68a',
-                        padding: '2px 8px',
-                        borderRadius: '12px',
-                        fontSize: '11px',
-                        fontWeight: '600'
-                      }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setShowWhtThresholdModal(true);
-                        showToast(`3% Withholding Tax requires a minimum transaction value of 20,000 ETB. Current total: ${formatCurrency(cartGrossTotal)}.`, 'warning');
-                      }}
-                      title="Click to view Ethiopian Withholding Tax rules"
-                    >
-                      ⚠️ Min. 20,000 ETB
-                    </button>
+              {/* Ethiopian 3% Withholding Tax (WHT) Section in Mobile Drawer - Appears only if total is past 20,000 ETB */}
+              {isWhtEligible && (
+                <div className="wht-checkout-box mb-3">
+                  <div className="wht-toggle-header">
+                    <label className="wht-checkbox-label" style={{ cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={isWithholding}
+                        onChange={(e) => setIsWithholding(e.target.checked)}
+                      />
+                      <span className="wht-toggle-title">Apply 3% Withholding Tax (WHT)</span>
+                    </label>
+                    <span className="badge-wht-hint">💡 Eligible (Over 20k ETB)</span>
+                  </div>
+
+                  {isWithholding && (
+                    <div className="wht-fields-container">
+                      <div className="form-group mb-2">
+                        <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Client / Company Name *</label>
+                        <input
+                          type="text"
+                          required={isWithholding}
+                          placeholder="e.g. Sunshine Construction PLC"
+                          value={customerName}
+                          onChange={(e) => setCustomerName(e.target.value)}
+                          className="form-input form-input-sm"
+                        />
+                      </div>
+
+                      <div className="form-grid-2 mb-2">
+                        <div>
+                          <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Customer TIN (10-digits)</label>
+                          <input
+                            type="text"
+                            placeholder="0012345678"
+                            value={customerTin}
+                            onChange={(e) => setCustomerTin(e.target.value)}
+                            className="form-input form-input-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>WHT Voucher Serial #</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. WHT-9481"
+                            value={whtVoucherNumber}
+                            onChange={(e) => setWhtVoucherNumber(e.target.value)}
+                            className="form-input form-input-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="wht-status-pill-group">
+                        <span className="text-xs text-muted">Voucher Status:</span>
+                        <div className="pill-options">
+                          <button
+                            type="button"
+                            className={`wht-status-chip ${whtVoucherStatus === 'received' ? 'active-success' : ''}`}
+                            onClick={() => setWhtVoucherStatus('received')}
+                          >
+                            ✓ Voucher In Hand
+                          </button>
+                          <button
+                            type="button"
+                            className={`wht-status-chip ${whtVoucherStatus === 'pending' ? 'active-warning' : ''}`}
+                            onClick={() => setWhtVoucherStatus('pending')}
+                          >
+                            ⏳ Pending Collection
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                {isWithholding && isWhtEligible && (
-                  <div className="wht-fields-container">
-                    <div className="form-group mb-2">
-                      <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Client / Company Name *</label>
-                      <input
-                        type="text"
-                        required={isWithholding}
-                        placeholder="e.g. Sunshine Construction PLC"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className="form-input form-input-sm"
-                      />
-                    </div>
-
-                    <div className="form-grid-2 mb-2">
-                      <div>
-                        <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Customer TIN (10-digits)</label>
-                        <input
-                          type="text"
-                          placeholder="0012345678"
-                          value={customerTin}
-                          onChange={(e) => setCustomerTin(e.target.value)}
-                          className="form-input form-input-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>WHT Voucher Serial #</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. WHT-9481"
-                          value={whtVoucherNumber}
-                          onChange={(e) => setWhtVoucherNumber(e.target.value)}
-                          className="form-input form-input-sm"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="wht-status-pill-group">
-                      <span className="text-xs text-muted">Voucher Status:</span>
-                      <div className="pill-options">
-                        <button
-                          type="button"
-                          className={`wht-status-chip ${whtVoucherStatus === 'received' ? 'active-success' : ''}`}
-                          onClick={() => setWhtVoucherStatus('received')}
-                        >
-                          ✓ Voucher In Hand
-                        </button>
-                        <button
-                          type="button"
-                          className={`wht-status-chip ${whtVoucherStatus === 'pending' ? 'active-warning' : ''}`}
-                          onClick={() => setWhtVoucherStatus('pending')}
-                        >
-                          ⏳ Pending Collection
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
 
               {/* Financials Breakdown in Mobile Drawer */}
               <div className="cart-financials">
@@ -1082,110 +995,6 @@ export default function NewSale({ setActiveTab }) {
                   ? `Confirm Sale (Collect ${formatCurrency(cartNetPayable)} Net)`
                   : `Confirm Sale (${formatCurrency(cartGrossTotal)})`
                 }
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Withholding Tax Threshold Informational Modal */}
-      {showWhtThresholdModal && (
-        <div className="modal-backdrop" onClick={() => setShowWhtThresholdModal(false)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-            <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  backgroundColor: '#fef3c7',
-                  color: '#d97706',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <AlertTriangleIcon size={20} />
-                </div>
-                <div>
-                  <h3 className="modal-title">Withholding Tax Not Applicable</h3>
-                  <p className="modal-subtitle">Ethiopian Revenue Authority (ERCA/MOR) Rule</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn-modal-close"
-                onClick={() => setShowWhtThresholdModal(false)}
-                title="Close"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="modal-body" style={{ paddingTop: '12px', paddingBottom: '16px' }}>
-              <p style={{ fontSize: '13.5px', lineHeight: '1.55', color: '#4b5563', marginBottom: '16px' }}>
-                Under Ethiopian Tax Proclamations, <strong>3% Withholding Tax (WHT)</strong> applies exclusively to commercial transactions with a gross invoice value of <strong>20,000 ETB or greater</strong>.
-              </p>
-
-              <div style={{
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '8px',
-                padding: '14px 16px',
-                marginBottom: '16px'
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
-                  <span style={{ color: '#64748b' }}>Current Cart Gross Total:</span>
-                  <strong style={{ color: '#0f172a' }}>{formatCurrency(cartGrossTotal)}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px' }}>
-                  <span style={{ color: '#64748b' }}>WHT Minimum Threshold:</span>
-                  <strong style={{ color: '#0f172a' }}>{formatCurrency(WHT_MINIMUM_THRESHOLD)}</strong>
-                </div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  paddingTop: '8px',
-                  borderTop: '1px dashed #cbd5e1',
-                  fontSize: '13.5px',
-                  color: '#b45309',
-                  fontWeight: 700
-                }}>
-                  <span>Amount Needed to Qualify:</span>
-                  <span>+{formatCurrency(Math.max(0, WHT_MINIMUM_THRESHOLD - cartGrossTotal))}</span>
-                </div>
-              </div>
-
-              <div style={{
-                fontSize: '12px',
-                color: '#475569',
-                lineHeight: '1.45',
-                backgroundColor: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                borderRadius: '6px',
-                padding: '10px 12px'
-              }}>
-                💡 <strong>Commercial Tip:</strong> If the client requires a 3% Withholding Tax receipt (WHT voucher), add more paint or colorants to bring the invoice total to <strong>20,000 ETB or above</strong>.
-              </div>
-            </div>
-
-            <div style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: '8px',
-              padding: '12px 20px',
-              borderTop: '1px solid #e2e8f0',
-              backgroundColor: '#f8fafc',
-              borderBottomLeftRadius: '12px',
-              borderBottomRightRadius: '12px'
-            }}>
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={() => setShowWhtThresholdModal(false)}
-                style={{ padding: '8px 22px', fontSize: '13.5px', fontWeight: 600 }}
-              >
-                Understood
               </button>
             </div>
           </div>
