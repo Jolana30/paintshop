@@ -498,8 +498,13 @@ export function StockProvider({ children }) {
     const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     const finalPayment = paymentType || "Cash";
 
-    // Ethiopian 3% Withholding Tax computation
-    const isWht = Boolean(withholdingDetails?.isWithholding);
+    // Ethiopian 3% Withholding Tax computation (requires minimum 20,000 ETB gross invoice)
+    const isWhtRequested = Boolean(withholdingDetails?.isWithholding);
+    if (isWhtRequested && grossTotal < 20000) {
+      showToast('Withholding tax (3%) requires a minimum transaction total of 20,000 ETB.', 'warning');
+      return false;
+    }
+    const isWht = isWhtRequested && grossTotal >= 20000;
     const whtRate = 3.0;
     const whtAmount = isWht ? Math.round((grossTotal * (whtRate / 100)) * 100) / 100 : 0;
     const netPayable = isWht ? (grossTotal - whtAmount) : grossTotal;

@@ -255,8 +255,12 @@ BEGIN
     END LOOP;
 
     -- S-03: Authoritative Withholding Tax computation (Ethiopian official 3% on goods)
+    -- Under Ethiopian tax law, withholding tax applies only to transactions >= 20,000 ETB
     v_is_wht := COALESCE((p_sale->>'is_withholding')::BOOLEAN, FALSE);
     IF v_is_wht THEN
+        IF v_calculated_gross < 20000.00 THEN
+            RAISE EXCEPTION 'Withholding tax (3%%) requires a minimum transaction value of 20,000 ETB. Current gross total is % ETB', v_calculated_gross;
+        END IF;
         v_wht_rate := 3.00;
         v_wht_amount := ROUND(v_calculated_gross * 0.03, 2);
         v_net_payable := v_calculated_gross - v_wht_amount;
