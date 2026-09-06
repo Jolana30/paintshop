@@ -135,3 +135,37 @@ The prior sale/stock consistency issues have been materially improved: the appli
 6. Sale RPC: rejects empty carts, forged totals, manipulated WHT, duplicate sale IDs, unknown products, and insufficient stock; it rolls back completely on each failure.
 7. Two simultaneous sales for the final unit: exactly one succeeds.
 8. Fresh login on a second device: shows authoritative cloud inventory, sales, and movements.
+
+---
+
+## Follow-up recheck — 2026-09-07
+
+### Improvements confirmed
+
+- The clean schema now uses SELECT-only tenant policies for inventory, sales, sale items, and stock movements. The supported mutation paths are hardened RPCs.
+- Sale recording now rejects empty carts and derives item pricing, totals, WHT, and net payable from inventory/catalogue values in the database.
+- Security-definer transaction functions now set `search_path = public, pg_temp`; public and anonymous function execution is revoked; authenticated users receive only the necessary operational RPC grants.
+- The approval RPC is granted to `service_role` only, and it now records an approval audit row. The public pending-registration UI no longer presents the approval action in cloud mode.
+- Cloud hydration now loads inventory, sales, and movements after an active shop signs in. Cloud mode now starts with no selected demo shop.
+- `npm run lint` and `npm run build` pass. `npm audit --omit=dev` still reports zero known production dependency vulnerabilities.
+
+### S-10 — Critical for existing deployments: migration leaves the former permissive shop policy in place
+
+**Evidence:** `supabase/migrations/20260907000000_security_hardening.sql` removes former inventory/sales policies (lines 45–52) but does not remove the former `shop_isolation_profile` policy on `shops`. That policy existed in the earlier schema as `FOR ALL USING (id = auth.uid()) WITH CHECK (id = auth.uid())`.
+
+**Impact:** PostgreSQL RLS policies are additive (permissive by default). On a database upgraded from the earlier schema, the old `shop_isolation_profile` policy remains alongside the new restricted contact-details policy. A tenant can therefore still update its own `status` to `active`, defeating approval. The clean-reset `schema.sql` does not show this issue because it drops and recreates the table, but a production migration does.
+
+**Required remediation:** add this before creating the replacement shops policies in the hardening migration:
+
+```sql
+DROP POLICY IF EXISTS "shop_isolation_profile" ON shops;
+```
+
+Also inspect the live project with `pg_policies` (or Supabase Database Advisors) after migration and verify that no legacy `public_*` or `shop_isolation_*` write policy remains on any exposed application table.
+
+### Remaining advisory items
+
+- The admin approval RPC is intentionally not browser-callable. A separate server-side/Edge Function admin workflow, using a service credential that never reaches the browser, is still required for real approvals.
+- Access and refresh tokens remain in `localStorage`; protect against XSS and consider secure `HttpOnly` cookie sessions.
+- The provisioning trigger functions should also receive explicit fixed `search_path` settings for consistency with the other privileged functions.
+- Deployment security headers are still not defined in `vercel.json` or `netlify.toml`.

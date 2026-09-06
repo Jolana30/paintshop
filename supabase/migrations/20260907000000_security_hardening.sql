@@ -41,7 +41,25 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE
 SET search_path = public, pg_temp;
 
--- 3. S-02: Convert Tenant Policies to Strictly SELECT-Only
+-- 3. S-02: Convert Tenant Policies to Strictly SELECT-Only & Secure Shops Table
+-- Critical P0 Fix: Explicitly remove legacy permissive shop policies that allowed self-approval
+DROP POLICY IF EXISTS "shop_isolation_profile" ON shops;
+DROP POLICY IF EXISTS "shop_profile_isolation" ON shops;
+DROP POLICY IF EXISTS "shops_can_read_own_profile" ON shops;
+DROP POLICY IF EXISTS "shops_can_update_own_contact_details" ON shops;
+
+CREATE POLICY "shops_can_read_own_profile" ON shops
+    FOR SELECT TO authenticated
+    USING (id = auth.uid());
+
+CREATE POLICY "shops_can_update_own_contact_details" ON shops
+    FOR UPDATE TO authenticated
+    USING (id = auth.uid())
+    WITH CHECK (
+        id = auth.uid()
+        AND status = (SELECT s.status FROM shops s WHERE s.id = auth.uid())
+    );
+
 DROP POLICY IF EXISTS "shop_active_inventory" ON shop_inventory;
 DROP POLICY IF EXISTS "shop_active_sales" ON sales;
 DROP POLICY IF EXISTS "shop_active_sale_items" ON sale_items;
@@ -657,6 +675,7 @@ SET search_path = public, pg_temp;
 -- 10. S-04: Enforce Least-Privilege Execution Grants
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon;
+REVOKE EXECUTE ON FUNCTION admin_approve_shop(UUID) FROM authenticated;
 
 -- Grant tenant RPCs only to authenticated users
 GRANT EXECUTE ON FUNCTION is_active_shop() TO authenticated;
@@ -688,3 +707,52 @@ BEGIN
         ALTER TABLE sale_items ADD CONSTRAINT check_sale_items_subtotal_non_negative CHECK (subtotal >= 0);
     END IF;
 END $$;
+
+-- 12. P3: Pin search_path on Provisioning Trigger Functions
+CREATE OR REPLACE FUNCTION public.handle_auth_user_created()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO public.shops (
+        id,
+        name,
+        owner_name,
+        phone,
+        city_address,
+        tin_number,
+        email,
+        status
+    ) VALUES (
+        NEW.id,
+        COALESCE(NEW.raw_user_meta_data->>'shop_name', 'Paint Store Branch'),
+        COALESCE(NEW.raw_user_meta_data->>'owner_name', ''),
+        COALESCE(NEW.raw_user_meta_data->>'phone', ''),
+        COALESCE(NEW.raw_user_meta_data->>'city_address', ''),
+        NULLIF(NEW.raw_user_meta_data->>'tin_number', ''),
+        NEW.email,
+        'pending_approval'
+    )
+    ON CONFLICT (id) DO NOTHING;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp;
+
+CREATE OR REPLACE FUNCTION handle_new_shop_signup()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO shop_inventory (shop_id, master_product_id, is_custom, stock, min_stock)
+    SELECT 
+        NEW.id,
+        mp.id,
+        FALSE,
+        0,
+        mp.min_stock
+    FROM master_products mp
+    ON CONFLICT (shop_id, master_product_id) DO NOTHING;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp;
+

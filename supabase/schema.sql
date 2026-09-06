@@ -158,6 +158,12 @@ CREATE POLICY "read_master_products" ON master_products
     FOR SELECT USING (true);
 
 -- Shops Table Policies:
+-- Critical P0 Fix: Explicitly remove legacy permissive shop policies that allowed self-approval
+DROP POLICY IF EXISTS "shop_isolation_profile" ON shops;
+DROP POLICY IF EXISTS "shop_profile_isolation" ON shops;
+DROP POLICY IF EXISTS "shops_can_read_own_profile" ON shops;
+DROP POLICY IF EXISTS "shops_can_update_own_contact_details" ON shops;
+
 CREATE POLICY "shops_can_read_own_profile" ON shops
     FOR SELECT TO authenticated
     USING (id = auth.uid());
@@ -223,7 +229,8 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -248,7 +255,8 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp;
 
 DROP TRIGGER IF EXISTS on_shop_created ON shops;
 CREATE TRIGGER on_shop_created
@@ -838,6 +846,7 @@ SET search_path = public, pg_temp;
 -- S-04: Enforce Least-Privilege Execution Grants
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon;
+REVOKE EXECUTE ON FUNCTION admin_approve_shop(UUID) FROM authenticated;
 
 GRANT EXECUTE ON FUNCTION is_active_shop() TO authenticated;
 GRANT EXECUTE ON FUNCTION record_sale_transaction(JSONB, JSONB) TO authenticated;

@@ -321,5 +321,37 @@ export const supabaseApi = {
         updated_at: new Date().toISOString()
       })
     });
+  },
+
+  /**
+   * Super Admin approval service (P1): Calls the secure backend Edge Function endpoint
+   * using admin credentials (JWT with admin claim or admin key).
+   */
+  async approveShopViaAdminService(shopId, { adminToken, adminKey } = {}) {
+    if (!isSupabaseConfigured) return { success: true, shop_id: shopId, status: 'active' };
+
+    const headers = {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_ANON_KEY
+    };
+    if (adminToken) {
+      headers['Authorization'] = `Bearer ${adminToken}`;
+    }
+    if (adminKey) {
+      headers['x-admin-key'] = adminKey;
+    }
+
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/approve-shop`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ shop_id: shopId })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Admin approval failed with status ${res.status}`);
+    }
+
+    return res.json();
   }
 };
