@@ -6,7 +6,21 @@ import {
 } from '../components/Icons';
 
 export default function AuthPage() {
-  const { currentShop, loginShop, registerShop, approveShop, logoutShop, authError, clearAuthError } = useStock();
+  const {
+    currentShop,
+    allShops,
+    loginShop,
+    registerShop,
+    approveShop,
+    suspendShop,
+    deleteShop,
+    logoutShop,
+    authError,
+    clearAuthError,
+    refreshData,
+    showToast
+  } = useStock();
+
   const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register'
 
   // Login form state
@@ -27,6 +41,35 @@ export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [formMessage, setFormMessage] = useState(null);
   const [emailConfirmationNotice, setEmailConfirmationNotice] = useState(null);
+
+  // Platform Admin Console State
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [adminPin, setAdminPin] = useState('');
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [adminError, setAdminError] = useState('');
+  const [adminFilter, setAdminFilter] = useState('all'); // 'all' | 'pending' | 'active'
+
+  // Strict Phone Validation: Only allow digits 0-9, leading +, spaces, hyphens
+  const handlePhoneKeyDown = (e) => {
+    // Allow navigation, deletion, backspace, tab, enter, escape
+    if (['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+      return;
+    }
+    // Allow keyboard shortcuts (Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X, Cmd+A, etc.)
+    if (e.ctrlKey || e.metaKey) {
+      return;
+    }
+    // Strictly prevent letters and special characters
+    if (!/[\d+ -]/.test(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  const handlePhoneChange = (e) => {
+    // Strip non-digit / non-phone characters
+    const clean = e.target.value.replace(/[^\d+ -]/g, '');
+    setPhone(clean);
+  };
 
   // Quick Demo presets for testing
   const handleQuickDemoLogin = (shopType) => {
@@ -95,18 +138,249 @@ export default function AuthPage() {
     if (res?.success) {
       if (res.requireEmailConfirmation) {
         setEmailConfirmationNotice(res.email);
-      } else {
-        setFormMessage({
-          type: 'success',
-          text: 'Shop successfully registered! Your application is pending administrator activation.'
-        });
       }
+      // Note: If success, StockContext immediately sets currentShop with status 'pending_approval'
+      // which immediately triggers rendering of the Pending Approval Holding Screen!
     } else {
       setFormMessage({
         type: 'error',
         text: res?.message || authError || 'Registration could not be completed. Please try again.'
       });
     }
+  };
+
+  const handleAdminUnlock = (e) => {
+    e.preventDefault();
+    if (adminPin.trim() === 'admin2026') {
+      setIsAdminAuthenticated(true);
+      setAdminError('');
+    } else {
+      setAdminError('Incorrect Master PIN. (Default: admin2026)');
+    }
+  };
+
+  // Filtered shops list for Platform Admin Console
+  const filteredShops = (allShops || []).filter(s => {
+    if (adminFilter === 'pending') return s.status !== 'active';
+    if (adminFilter === 'active') return s.status === 'active';
+    return true;
+  });
+
+  const pendingCount = (allShops || []).filter(s => s.status !== 'active').length;
+  const activeCount = (allShops || []).filter(s => s.status === 'active').length;
+
+  // Render Platform Admin Console Modal
+  const renderAdminModal = () => {
+    if (!isAdminModalOpen) return null;
+
+    return (
+      <div className="admin-modal-overlay" onClick={() => setIsAdminModalOpen(false)}>
+        <div className="admin-modal-container" onClick={(e) => e.stopPropagation()}>
+          <div className="admin-modal-header">
+            <div>
+              <h3>🛡️ PaintFlow Platform Admin Console</h3>
+              <p>Store Approvals, Activation Gate & Commercial SaaS Manager</p>
+            </div>
+            <button
+              type="button"
+              className="admin-modal-close"
+              onClick={() => setIsAdminModalOpen(false)}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="admin-modal-body">
+            {!isAdminAuthenticated ? (
+              <form onSubmit={handleAdminUnlock} className="admin-auth-box">
+                <div className="admin-auth-icon">🔐</div>
+                <h4 className="admin-auth-title">Platform Administrator Access</h4>
+                <p className="admin-auth-desc">
+                  Enter the platform master PIN to manage paid subscriptions, approve newly registered shops, or suspend accounts.
+                </p>
+
+                {adminError && (
+                  <div className="auth-banner banner-error mb-3" style={{ padding: '0.6rem', fontSize: '0.8rem' }}>
+                    {adminError}
+                  </div>
+                )}
+
+                <input
+                  type="password"
+                  required
+                  autoFocus
+                  placeholder="Master PIN (admin2026)"
+                  value={adminPin}
+                  onChange={(e) => { setAdminPin(e.target.value); setAdminError(''); }}
+                  className="admin-pin-input"
+                />
+
+                <button
+                  type="submit"
+                  className="btn-auth-submit"
+                  style={{ marginTop: '0.25rem' }}
+                >
+                  Unlock Admin Console
+                </button>
+              </form>
+            ) : (
+              <div>
+                {/* Stats Bar */}
+                <div className="admin-stats-bar">
+                  <div className="admin-stat-card">
+                    <span className="admin-stat-val">{(allShops || []).length}</span>
+                    <span className="admin-stat-label">Total Stores</span>
+                  </div>
+                  <div className="admin-stat-card" style={{ borderColor: '#fde68a', background: '#fffdf5' }}>
+                    <span className="admin-stat-val" style={{ color: '#d97706' }}>{pendingCount}</span>
+                    <span className="admin-stat-label">Pending Approval</span>
+                  </div>
+                  <div className="admin-stat-card" style={{ borderColor: '#d1fae5', background: '#fcfdfd' }}>
+                    <span className="admin-stat-val" style={{ color: '#059669' }}>{activeCount}</span>
+                    <span className="admin-stat-label">Active Paid Licenses</span>
+                  </div>
+                </div>
+
+                {/* Filter Tabs */}
+                <div className="admin-tabs-row">
+                  <button
+                    type="button"
+                    className={`admin-tab-btn ${adminFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setAdminFilter('all')}
+                  >
+                    All Stores ({(allShops || []).length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`admin-tab-btn ${adminFilter === 'pending' ? 'active' : ''}`}
+                    onClick={() => setAdminFilter('pending')}
+                  >
+                    Pending Activation ({pendingCount})
+                  </button>
+                  <button
+                    type="button"
+                    className={`admin-tab-btn ${adminFilter === 'active' ? 'active' : ''}`}
+                    onClick={() => setAdminFilter('active')}
+                  >
+                    Active Stores ({activeCount})
+                  </button>
+                </div>
+
+                {/* Shops List */}
+                <div className="admin-shops-list">
+                  {filteredShops.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b', fontSize: '0.9rem' }}>
+                      No stores found matching this filter.
+                    </div>
+                  ) : (
+                    filteredShops.map(shop => {
+                      const isPending = shop.status !== 'active';
+                      return (
+                        <div
+                          key={shop.id}
+                          className={`admin-shop-card ${isPending ? 'is-pending' : 'is-active'}`}
+                        >
+                          <div className="admin-shop-card-top">
+                            <div>
+                              <h4 className="admin-shop-name">{shop.name}</h4>
+                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                ID: <code>{shop.id}</code>
+                              </span>
+                            </div>
+                            <span className={`badge-pill ${isPending ? 'badge-warning' : 'badge-success'}`}>
+                              {isPending ? '⏳ Pending Approval' : '✓ Active & Paid'}
+                            </span>
+                          </div>
+
+                          <div className="admin-shop-meta-grid">
+                            <div className="admin-shop-meta-item">
+                              <strong>Owner / Contact:</strong> {shop.owner_name || 'N/A'}
+                            </div>
+                            <div className="admin-shop-meta-item">
+                              <strong>Phone:</strong> {shop.phone || 'N/A'}
+                            </div>
+                            <div className="admin-shop-meta-item">
+                              <strong>Email:</strong> {shop.email}
+                            </div>
+                            <div className="admin-shop-meta-item">
+                              <strong>Location:</strong> {shop.city_address || 'Addis Ababa'}
+                            </div>
+                            {shop.tin_number && (
+                              <div className="admin-shop-meta-item">
+                                <strong>TIN:</strong> {shop.tin_number}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="admin-shop-actions">
+                            {isPending ? (
+                              <button
+                                type="button"
+                                className="btn-admin-act-approve"
+                                onClick={() => approveShop(shop.id)}
+                              >
+                                ✓ Approve & Activate Store
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn-admin-act-suspend"
+                                onClick={() => suspendShop(shop.id)}
+                              >
+                                ⏸️ Suspend Access
+                              </button>
+                            )}
+
+                            {!shop.isDemo && (
+                              <button
+                                type="button"
+                                className="btn-admin-act-delete"
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to remove "${shop.name}"?`)) {
+                                    deleteShop(shop.id);
+                                  }
+                                }}
+                              >
+                                ✕ Remove
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="admin-modal-footer">
+            {isAdminAuthenticated && (
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem' }}
+                onClick={() => {
+                  setIsAdminAuthenticated(false);
+                  setAdminPin('');
+                }}
+              >
+                🔒 Lock Console
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn-primary"
+              style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
+              onClick={() => setIsAdminModalOpen(false)}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Show email confirmation holding view if user must verify inbox first
@@ -140,20 +414,32 @@ export default function AuthPage() {
     );
   }
 
-  // If a shop is registered but pending approval, show clean holding screen with 1-click activation
+  // 1-Click Paid SaaS Activation Gate: If a shop is registered but pending approval
   if (currentShop && currentShop.status === 'pending_approval') {
     return (
       <div className="auth-fullscreen-container">
+        {renderAdminModal()}
         <div className="auth-approval-card">
-          <div className="approval-icon-wrapper" style={{ background: '#ecfdf5', color: '#059669' }}>
-            <span className="approval-badge-icon">🏪</span>
+          <div className="approval-icon-wrapper" style={{ background: '#fef3c7', color: '#d97706' }}>
+            <span className="approval-badge-icon">⏳</span>
           </div>
-          <h2 className="approval-title">Activate Your Store</h2>
+          <h2 className="approval-title">Store Account Pending Activation</h2>
           <p className="approval-subtitle">
             Welcome to PaintFlow, <strong>{currentShop.name}</strong>!
           </p>
 
+          <div className="holding-commercial-box">
+            <h4>🛡️ Commercial SaaS License Notice</h4>
+            <p>
+              PaintFlow is a specialized commercial POS and inventory solution for Jotun paint dealers. Because it is a paid business service, newly registered shops must be confirmed and activated by the platform administrator before counter sales and inventory registers are unlocked.
+            </p>
+          </div>
+
           <div className="approval-details-box">
+            <div className="detail-row">
+              <span className="detail-label">Store / Branch:</span>
+              <span className="detail-val">{currentShop.name}</span>
+            </div>
             <div className="detail-row">
               <span className="detail-label">Location / City:</span>
               <span className="detail-val">{currentShop.city_address}</span>
@@ -161,6 +447,10 @@ export default function AuthPage() {
             <div className="detail-row">
               <span className="detail-label">Contact Phone:</span>
               <span className="detail-val">{currentShop.phone}</span>
+            </div>
+            <div className="detail-row">
+              <span className="detail-label">Personal / Store Email:</span>
+              <span className="detail-val">{currentShop.email}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Owner / Contact:</span>
@@ -173,32 +463,57 @@ export default function AuthPage() {
               </div>
             )}
             <div className="detail-row">
-              <span className="detail-label">Catalog Status:</span>
-              <span className="badge-pill badge-success">46 Official Jotun Paints Ready</span>
+              <span className="detail-label">Jotun Catalog:</span>
+              <span className="badge-pill badge-success">46 Official Paints Initialized</span>
+            </div>
+            <div className="detail-row">
+              <span className="detail-label">Account Status:</span>
+              <span className="badge-pill badge-warning">⏳ Pending Subscription Activation</span>
             </div>
           </div>
 
-          <p className="approval-note">
-            Your store account and official Jotun paint catalog are set up. Click below to activate your store and open your counter POS and inventory register.
-          </p>
+          <div className="holding-support-box">
+            <div><strong>To activate your subscription or confirm bank transfer:</strong></div>
+            <div className="holding-contact-line">
+              <span>📞 Platform Desk:</span>
+              <span>+251 911 234 567 / +251 922 987 654</span>
+            </div>
+            <div className="holding-contact-line">
+              <span>✉️ Billing Email:</span>
+              <span>billing@paintflow.et</span>
+            </div>
+          </div>
 
           <div className="admin-demo-approval-action">
+            {/* Direct Admin Review Button */}
             <button
               type="button"
               className="btn-admin-approve"
-              style={{ width: '100%', justifyContent: 'center', background: '#059669', color: '#ffffff', padding: '0.85rem' }}
-              onClick={() => approveShop(currentShop.id)}
+              style={{ width: '100%', justifyContent: 'center', background: '#0f172a', color: '#ffffff', padding: '0.85rem' }}
+              onClick={() => setIsAdminModalOpen(true)}
             >
-              <CheckCircleIcon size={18} />
-              <span>✓ Activate Store & Start Selling</span>
+              <span>🛡️ Platform Admin: Review & Activate Store</span>
             </button>
+
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ marginTop: '0.75rem', width: '100%', display: 'flex', justifyContent: 'center', gap: '0.4rem', alignItems: 'center' }}
+              onClick={async () => {
+                await refreshData();
+                showToast("Checking store activation status...", "info");
+              }}
+            >
+              <span>🔄 Check Activation Status</span>
+            </button>
+
             <button
               type="button"
               className="btn-secondary"
               style={{ marginTop: '0.75rem', width: '100%', display: 'flex', justifyContent: 'center' }}
               onClick={logoutShop}
             >
-              Sign Out
+              ⎋ Sign Out / Change Account
             </button>
           </div>
         </div>
@@ -208,6 +523,7 @@ export default function AuthPage() {
 
   return (
     <div className="auth-fullscreen-container">
+      {renderAdminModal()}
       <div className="auth-card-wrapper">
         {/* Left Presentation Hero */}
         <div className="auth-hero-panel">
@@ -306,6 +622,7 @@ export default function AuthPage() {
             </button>
           </div>
 
+          {/* Top Feedback Banner */}
           {(formMessage || authError) && (
             <div className={`auth-banner ${formMessage?.type === 'success' ? 'banner-success' : 'banner-error'}`}>
               <span>{formMessage?.text || authError}</span>
@@ -320,11 +637,11 @@ export default function AuthPage() {
               </div>
 
               <div className="form-field">
-                <label className="field-label">Store Email Address</label>
+                <label className="field-label">Personal or Store Email</label>
                 <input
                   type="email"
                   required
-                  placeholder="e.g. bole@jotunshop.et"
+                  placeholder="e.g. yourname@gmail.com or store@example.com"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   className="field-input"
@@ -413,13 +730,14 @@ export default function AuthPage() {
                   />
                 </div>
                 <div className="form-field">
-                  <label className="field-label">Phone Number *</label>
+                  <label className="field-label">Phone Number (Digits Only) *</label>
                   <input
                     type="tel"
                     required
-                    placeholder="e.g. 0911 234 567"
+                    placeholder="e.g. 0911234567 or +251911234567"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onKeyDown={handlePhoneKeyDown}
+                    onChange={handlePhoneChange}
                     className="field-input"
                     autoComplete="tel"
                     inputMode="tel"
@@ -458,11 +776,11 @@ export default function AuthPage() {
 
               <div className="form-grid-2">
                 <div className="form-field">
-                  <label className="field-label">Email Address *</label>
+                  <label className="field-label">Personal or Store Email *</label>
                   <input
                     type="email"
                     required
-                    placeholder="store@example.com"
+                    placeholder="e.g. yourname@gmail.com or store@example.com"
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
                     className="field-input"
@@ -498,12 +816,19 @@ export default function AuthPage() {
                 </div>
               </div>
 
+              {/* Bottom error banner right above submit button for immediate feedback */}
+              {(formMessage || authError) && (
+                <div className={`auth-banner ${formMessage?.type === 'success' ? 'banner-success' : 'banner-error'}`} style={{ marginTop: '0.75rem', marginBottom: '0.25rem' }}>
+                  <span>{formMessage?.text || authError}</span>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isLoading}
                 className="btn-auth-submit"
               >
-                {isLoading ? 'Creating Store Account...' : 'Register Paint Shop'}
+                {isLoading ? 'Submitting Registration...' : 'Register Paint Shop'}
               </button>
 
               <div className="auth-footer-help">
@@ -518,6 +843,17 @@ export default function AuthPage() {
               </div>
             </form>
           )}
+
+          {/* Admin Console Access Link */}
+          <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+            <button
+              type="button"
+              className="btn-open-admin-link"
+              onClick={() => setIsAdminModalOpen(true)}
+            >
+              🛡️ Platform Admin Console (Platform Owner)
+            </button>
+          </div>
 
           {/* Legal Nominative Fair Use Disclaimer */}
           <div className="legal-disclaimer-box">

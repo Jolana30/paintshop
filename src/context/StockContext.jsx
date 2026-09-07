@@ -39,7 +39,13 @@ export function StockProvider({ children }) {
   // 1. Multi-Shop Registry & Active Session
   const [allShops, setAllShops] = useState(() => {
     const saved = localStorage.getItem('paintflow_all_shops');
-    return saved ? JSON.parse(saved) : (isSupabaseConfigured ? [] : DEFAULT_DEMO_SHOPS);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch { /* ignore */ }
+    }
+    return DEFAULT_DEMO_SHOPS;
   });
 
   const [currentShop, setCurrentShop] = useState(() => {
@@ -50,6 +56,40 @@ export function StockProvider({ children }) {
     // S-06: In cloud mode, require explicit authentication. In offline mode, default to demo shop.
     return isSupabaseConfigured ? null : DEFAULT_DEMO_SHOPS[0];
   });
+
+  // Hydrate all registered shops from Supabase if connected
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const fetchRemoteShops = async () => {
+      try {
+        const remoteShops = await supabaseApi.getAllShops();
+        if (Array.isArray(remoteShops) && remoteShops.length > 0) {
+          setAllShops(prev => {
+            const map = new Map();
+            DEFAULT_DEMO_SHOPS.forEach(s => map.set(s.id, s));
+            prev.forEach(s => map.set(s.id, s));
+            remoteShops.forEach(s => {
+              map.set(s.id, {
+                id: s.id,
+                name: s.name,
+                owner_name: s.owner_name,
+                phone: s.phone,
+                city_address: s.city_address,
+                tin_number: s.tin_number,
+                email: s.email,
+                status: s.status || 'pending_approval',
+                created_at: s.created_at
+              });
+            });
+            return Array.from(map.values());
+          });
+        }
+      } catch (err) {
+        console.warn('[Supabase] Could not fetch remote shop list:', err);
+      }
+    };
+    fetchRemoteShops();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('paintflow_all_shops', JSON.stringify(allShops));
@@ -288,6 +328,7 @@ export function StockProvider({ children }) {
       try {
         const res = await supabaseAuth.signIn({ email, password });
         if (res?.user) {
+          const existingShop = allShops.find(s => s.email?.toLowerCase() === email.toLowerCase() || s.id === (res.profile?.id || res.user.id));
           const profile = res.profile || {
             id: res.user.id,
             name: res.user.user_metadata?.shop_name || 'My Jotun Store',
@@ -295,10 +336,12 @@ export function StockProvider({ children }) {
             phone: res.user.user_metadata?.phone || '',
             city_address: res.user.user_metadata?.city_address || '',
             tin_number: res.user.user_metadata?.tin_number || '',
-            status: 'active'
+            status: existingShop?.status || 'pending_approval'
           };
 
-          if (!profile.status) profile.status = 'active';
+          if (!profile.status) {
+            profile.status = existingShop?.status || 'pending_approval';
+          }
 
           setCurrentShop(profile);
           setAllShops(prev => [profile, ...prev.filter(s => s.id !== profile.id)]);
@@ -306,7 +349,7 @@ export function StockProvider({ children }) {
           if (profile.status === 'active') {
             showToast(`Welcome back, ${profile.name}!`, 'success');
           } else {
-            showToast(`Signed in to ${profile.name}. Ready for activation.`, 'info');
+            showToast(`Signed in to ${profile.name}. Account is pending subscription activation.`, 'info');
           }
           return true;
         }
@@ -332,6 +375,19 @@ export function StockProvider({ children }) {
   const registerShop = async ({ shopName, ownerName, phone, cityAddress, tinNumber, email, password }) => {
     setAuthError(null);
 
+    const fallbackId = 'shop-' + Date.now();
+    let newShop = {
+      id: fallbackId,
+      name: shopName,
+      owner_name: ownerName || 'Store Owner',
+      phone,
+      city_address: cityAddress,
+      tin_number: tinNumber || '',
+      email,
+      status: 'pending_approval',
+      created_at: new Date().toISOString()
+    };
+
     if (isSupabaseConfigured) {
       try {
         const res = await supabaseAuth.signUp({
@@ -344,89 +400,100 @@ export function StockProvider({ children }) {
           tinNumber
         });
 
-        if (res.requireEmailConfirmation) {
+        if (res?.user?.id) {
+          newShop.id = res.user.id;
+        } else if (res?.shop?.id) {
+          newShop.id = res.shop.id;
+        }
+      } catch (err) {
+        console.warn('Registration network/rate-limit notice:', err);
+        if (!err.message?.includes('rate limit') && !err.message?.includes('429')) {
+          setAuthError(err.message || 'Registration failed.');
           return {
-            success: true,
-            requireEmailConfirmation: true,
-            email: res.email,
-            message: 'Account created! Please check your email to confirm your registration.'
+            success: false,
+            message: err.message || 'Registration failed.'
           };
         }
-
-        const newShop = {
-          id: res.user?.id || ('shop-' + Date.now()),
-          name: shopName,
-          owner_name: ownerName,
-          phone,
-          city_address: cityAddress,
-          tin_number: tinNumber || '',
-          email,
-          status: 'active',
-          created_at: new Date().toISOString()
-        };
-
-        setAllShops(prev => [newShop, ...prev.filter(s => s.id !== newShop.id)]);
-        setCurrentShop(newShop);
-        showToast(`Welcome to PaintFlow, ${shopName}! Your Jotun store is active and ready.`, 'success');
-
-        return {
-          success: true,
-          requireEmailConfirmation: false,
-          shop: newShop
-        };
-      } catch (err) {
-        console.error('Registration failed:', err);
-        setAuthError(err.message || 'Registration failed. Please try again.');
-        return {
-          success: false,
-          message: err.message || 'Registration failed.'
-        };
       }
-    } else {
-      // Local demo mode registration
-      const newShopId = 'shop-' + Date.now();
-      const newShop = {
-        id: newShopId,
-        name: shopName,
-        owner_name: ownerName,
-        phone,
-        city_address: cityAddress,
-        tin_number: tinNumber,
-        email,
-        status: 'active',
-        isDemo: true,
-        created_at: new Date().toISOString()
-      };
-
-      setAllShops(prev => [newShop, ...prev]);
-      setCurrentShop(newShop);
-      showToast(`Welcome to PaintFlow, ${shopName}! Your store is active and ready.`, 'success');
-      return { success: true, requireEmailConfirmation: false, shop: newShop };
     }
+
+    // Gate all new store registrations under pending_approval (Paid SaaS commercial subscription model)
+    setAllShops(prev => [newShop, ...prev.filter(s => s.id !== newShop.id)]);
+    setCurrentShop(newShop);
+    localStorage.setItem('paintflow_current_shop', JSON.stringify(newShop));
+    showToast(`Store registered! Your account is pending administrator activation.`, 'info');
+
+    return {
+      success: true,
+      requireEmailConfirmation: false,
+      shop: newShop
+    };
   };
 
-  // Administrative / Self Approval Workflow
+  // Administrative Store Approval Workflow
   const approveShop = async (targetShopId) => {
     try {
       if (isSupabaseConfigured && !targetShopId.startsWith('shop-demo')) {
         await supabaseApi.updateShopStatus(targetShopId, 'active');
       }
 
-      const updated = allShops.map(s => s.id === targetShopId ? { ...s, status: 'active' } : s);
-      setAllShops(updated);
+      setAllShops(prev => prev.map(s => s.id === targetShopId ? { ...s, status: 'active' } : s));
       if (currentShop && currentShop.id === targetShopId) {
-        setCurrentShop(prev => ({ ...prev, status: 'active' }));
+        const activeShop = { ...currentShop, status: 'active' };
+        setCurrentShop(activeShop);
+        localStorage.setItem('paintflow_current_shop', JSON.stringify(activeShop));
       }
-      showToast("Store activated and unlocked! You can now start managing inventory and sales.", "success");
+      showToast("Store approved and activated! Ready for counter sales.", "success");
       return true;
     } catch (err) {
       console.error('Failed to approve shop:', err);
+      setAllShops(prev => prev.map(s => s.id === targetShopId ? { ...s, status: 'active' } : s));
       if (currentShop && currentShop.id === targetShopId) {
-        setCurrentShop(prev => ({ ...prev, status: 'active' }));
+        const activeShop = { ...currentShop, status: 'active' };
+        setCurrentShop(activeShop);
+        localStorage.setItem('paintflow_current_shop', JSON.stringify(activeShop));
       }
-      showToast("Store unlocked and ready to use!", "success");
+      showToast("Store activated and ready for counter sales.", "success");
       return true;
     }
+  };
+
+  // Administrative Store Suspension Workflow (Gating for Unpaid / Inactive Accounts)
+  const suspendShop = async (targetShopId) => {
+    try {
+      if (isSupabaseConfigured && !targetShopId.startsWith('shop-demo')) {
+        await supabaseApi.updateShopStatus(targetShopId, 'pending_approval');
+      }
+
+      setAllShops(prev => prev.map(s => s.id === targetShopId ? { ...s, status: 'pending_approval' } : s));
+      if (currentShop && currentShop.id === targetShopId) {
+        const suspendedShop = { ...currentShop, status: 'pending_approval' };
+        setCurrentShop(suspendedShop);
+        localStorage.setItem('paintflow_current_shop', JSON.stringify(suspendedShop));
+      }
+      showToast("Store suspended. Access gated until renewed.", "info");
+      return true;
+    } catch (err) {
+      console.error('Failed to suspend shop:', err);
+      setAllShops(prev => prev.map(s => s.id === targetShopId ? { ...s, status: 'pending_approval' } : s));
+      if (currentShop && currentShop.id === targetShopId) {
+        const suspendedShop = { ...currentShop, status: 'pending_approval' };
+        setCurrentShop(suspendedShop);
+        localStorage.setItem('paintflow_current_shop', JSON.stringify(suspendedShop));
+      }
+      showToast("Store status set to pending.", "info");
+      return true;
+    }
+  };
+
+  // Administrative Store Deletion
+  const deleteShop = (targetShopId) => {
+    setAllShops(prev => prev.filter(s => s.id !== targetShopId));
+    if (currentShop?.id === targetShopId) {
+      setCurrentShop(null);
+      localStorage.removeItem('paintflow_current_shop');
+    }
+    showToast("Shop removed from store registry.", "info");
   };
 
   const logoutShop = () => {
@@ -778,6 +845,8 @@ export function StockProvider({ children }) {
         loginShop,
         registerShop,
         approveShop,
+        suspendShop,
+        deleteShop,
         logoutShop,
         authError,
         clearAuthError: () => setAuthError(null),

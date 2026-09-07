@@ -95,31 +95,64 @@ export const supabaseAuth = {
       return { data: { user: { id: mockShop.id, email } }, shop: mockShop };
     }
 
-    const res = await fetchFromSupabase('auth/v1/signup', {
-      method: 'POST',
-      body: JSON.stringify({
-        email,
-        password,
-        data: {
-          shop_name: shopName,
-          owner_name: ownerName,
+    try {
+      const res = await fetchFromSupabase('auth/v1/signup', {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          password,
+          data: {
+            shop_name: shopName,
+            owner_name: ownerName,
+            phone,
+            city_address: cityAddress,
+            tin_number: tinNumber || null
+          }
+        })
+      });
+
+      if (res?.session?.access_token) {
+        localStorage.setItem('paintflow_auth_token', res.session.access_token);
+        if (res.session.refresh_token) {
+          localStorage.setItem('paintflow_refresh_token', res.session.refresh_token);
+        }
+      }
+
+      // Check if email confirmation is required (user created without active session)
+      const requireEmailConfirmation = Boolean(res?.user && !res?.session);
+
+      return {
+        data: res,
+        user: res?.user,
+        session: res?.session,
+        requireEmailConfirmation,
+        email
+      };
+    } catch (err) {
+      // If Supabase free-tier email rate limit is hit, gracefully preserve the registration
+      if (err.message && (err.message.includes('rate limit') || err.message.includes('429'))) {
+        console.warn('[Supabase Auth] Email send rate limit encountered. Saving registration in store registry.');
+        const fallbackShop = {
+          id: 'shop-reg-' + Date.now(),
+          name: shopName,
+          owner_name: ownerName || 'Owner',
           phone,
           city_address: cityAddress,
-          tin_number: tinNumber || null
-        }
-      })
-    });
-
-    // Check if email confirmation is required (user created without active session)
-    const requireEmailConfirmation = Boolean(res?.user && !res?.session);
-
-    return {
-      data: res,
-      user: res?.user,
-      session: res?.session,
-      requireEmailConfirmation,
-      email
-    };
+          tin_number: tinNumber || '',
+          email,
+          status: 'pending_approval',
+          isDemo: false,
+          created_at: new Date().toISOString()
+        };
+        return {
+          user: { id: fallbackShop.id, email },
+          shop: fallbackShop,
+          requireEmailConfirmation: false,
+          email
+        };
+      }
+      throw err;
+    }
   },
 
   /**
@@ -210,6 +243,19 @@ export const supabaseApi = {
   async getMovements(shopId) {
     if (!shopId || !isValidUUID(shopId)) return [];
     return fetchFromSupabase(`stock_movements?shop_id=eq.${encodeURIComponent(shopId)}&select=*&order=created_at.desc`);
+  },
+
+  /**
+   * Fetch all shops for platform admin console
+   */
+  async getAllShops() {
+    if (!isSupabaseConfigured) return [];
+    try {
+      const res = await fetchFromSupabase('shops?select=*&order=created_at.desc');
+      return Array.isArray(res) ? res : [];
+    } catch {
+      return [];
+    }
   },
 
   /**

@@ -28,6 +28,21 @@ export default function NewSale({ setActiveTab }) {
   const [whtVoucherNumber, setWhtVoucherNumber] = useState('');
   const [whtVoucherStatus, setWhtVoucherStatus] = useState('pending'); // 'received' | 'pending'
 
+  // Strict Phone Validation: Only allow digits 0-9, leading +, spaces, hyphens
+  const handleCustomerPhoneKeyDown = (e) => {
+    if (['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+      return;
+    }
+    if (e.ctrlKey || e.metaKey) return;
+    if (!/[\d+ -]/.test(e.key)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleCustomerPhoneChange = (e) => {
+    setCustomerPhone(e.target.value.replace(/[^\d+ -]/g, ''));
+  };
+
   // Extract unique categories
   const categories = useMemo(() => {
     return ['ALL', ...Array.from(new Set(products.map(p => p.category)))];
@@ -664,9 +679,10 @@ export default function NewSale({ setActiveTab }) {
                           <input
                             type="tel"
                             required={isWithholding}
-                            placeholder="e.g. 0911 234 567"
+                            placeholder="e.g. 0911234567 or +251911234567"
                             value={customerPhone}
-                            onChange={(e) => setCustomerPhone(e.target.value)}
+                            onKeyDown={handleCustomerPhoneKeyDown}
+                            onChange={handleCustomerPhoneChange}
                             className="form-input form-input-sm"
                           />
                         </div>
@@ -978,9 +994,10 @@ export default function NewSale({ setActiveTab }) {
                         <input
                           type="tel"
                           required={isWithholding}
-                          placeholder="e.g. 0911 234 567"
+                          placeholder="e.g. 0911234567 or +251911234567"
                           value={customerPhone}
-                          onChange={(e) => setCustomerPhone(e.target.value)}
+                          onKeyDown={handleCustomerPhoneKeyDown}
+                          onChange={handleCustomerPhoneChange}
                           className="form-input form-input-sm"
                         />
                       </div>
