@@ -13,6 +13,7 @@ export default function AuthPage() {
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Register form state
   const [shopName, setShopName] = useState('');
@@ -22,6 +23,7 @@ export default function AuthPage() {
   const [tinNumber, setTinNumber] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [formMessage, setFormMessage] = useState(null);
@@ -311,7 +313,8 @@ export default function AuthPage() {
               className={`auth-tab-btn ${activeTab === 'register' ? 'active' : ''}`}
               onClick={() => { setActiveTab('register'); setFormMessage(null); clearAuthError(); }}
             >
-              Register Paint Shop
+              <span className="tab-label-full">Register Paint Shop</span>
+              <span className="tab-label-short">Register</span>
             </button>
           </div>
 
@@ -337,19 +340,35 @@ export default function AuthPage() {
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   className="field-input"
+                  autoComplete="email"
+                  inputMode="email"
+                  enterKeyHint="next"
                 />
               </div>
 
               <div className="form-field">
                 <label className="field-label">Password</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  className="field-input"
-                />
+                <div className="password-field-wrapper">
+                  <input
+                    type={showLoginPassword ? 'text' : 'password'}
+                    required
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="field-input"
+                    autoComplete="current-password"
+                    enterKeyHint="go"
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    tabIndex={-1}
+                  >
+                    {showLoginPassword ? '👁️' : '👁️‍🗨️'}
+                  </button>
+                </div>
               </div>
 
               <button
@@ -387,6 +406,8 @@ export default function AuthPage() {
                   value={shopName}
                   onChange={(e) => setShopName(e.target.value)}
                   className="field-input"
+                  autoComplete="organization"
+                  enterKeyHint="next"
                 />
               </div>
 
@@ -399,6 +420,8 @@ export default function AuthPage() {
                     value={ownerName}
                     onChange={(e) => setOwnerName(e.target.value)}
                     className="field-input"
+                    autoComplete="name"
+                    enterKeyHint="next"
                   />
                 </div>
                 <div className="form-field">
@@ -410,6 +433,9 @@ export default function AuthPage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     className="field-input"
+                    autoComplete="tel"
+                    inputMode="tel"
+                    enterKeyHint="next"
                   />
                 </div>
               </div>
@@ -424,6 +450,8 @@ export default function AuthPage() {
                     value={cityAddress}
                     onChange={(e) => setCityAddress(e.target.value)}
                     className="field-input"
+                    autoComplete="street-address"
+                    enterKeyHint="next"
                   />
                 </div>
                 <div className="form-field">
@@ -434,6 +462,8 @@ export default function AuthPage() {
                     value={tinNumber}
                     onChange={(e) => setTinNumber(e.target.value)}
                     className="field-input"
+                    inputMode="numeric"
+                    enterKeyHint="next"
                   />
                 </div>
               </div>
@@ -448,18 +478,35 @@ export default function AuthPage() {
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
                     className="field-input"
+                    autoComplete="email"
+                    inputMode="email"
+                    enterKeyHint="next"
                   />
                 </div>
                 <div className="form-field">
                   <label className="field-label">Create Password *</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Minimum 6 characters"
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    className="field-input"
-                  />
+                  <div className="password-field-wrapper">
+                    <input
+                      type={showRegPassword ? 'text' : 'password'}
+                      required
+                      placeholder="Minimum 6 characters"
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      className="field-input"
+                      autoComplete="new-password"
+                      enterKeyHint="done"
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle-btn"
+                      aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      tabIndex={-1}
+                    >
+                      {showRegPassword ? '👁️' : '👁️‍🗨️'}
+                    </button>
+                  </div>
                 </div>
               </div>
 

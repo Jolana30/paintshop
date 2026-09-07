@@ -6,14 +6,14 @@ import {
   ShoppingCartIcon
 } from '../components/Icons';
 import { downloadExcelCsv } from '../utils/exportExcel';
-import { printOrSaveAsPdf } from '../utils/exportPdf';
+import { printOrSaveAsPdf, printSaleReceipt } from '../utils/exportPdf';
 
 export default function Sales({ setActiveTab, initialDate = '', onClearDateFilter }) {
-  const { sales, formatCurrency, updateSaleWhtVoucher } = useStock();
+  const { sales, formatCurrency, updateSaleWhtVoucher, currentShop } = useStock();
   const [editingVoucherSale, setEditingVoucherSale] = useState(null);
   const [inputVoucherNo, setInputVoucherNo] = useState('');
   const [inputVoucherStatus, setInputVoucherStatus] = useState('received');
-  const [whtFilter, setWhtFilter] = useState('ALL'); // 'ALL' | 'WHT_ONLY' | 'PENDING_ONLY'
+  const [voucherFilter, setVoucherFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'COLLECTED' | 'WHT_ALL'
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSale, setSelectedSale] = useState(null);
 
@@ -76,17 +76,27 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
     return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   };
 
+  // Withholding Voucher counts for quick navigation
+  const pendingVouchersCount = useMemo(() => (sales || []).filter(s => s.isWithholding && s.whtVoucherStatus === 'pending').length, [sales]);
+  const collectedVouchersCount = useMemo(() => (sales || []).filter(s => s.isWithholding && s.whtVoucherStatus === 'received').length, [sales]);
+  const totalWhtCount = useMemo(() => (sales || []).filter(s => s.isWithholding).length, [sales]);
+
   const filteredSales = useMemo(() => {
     return (sales || [])
       .filter(s => {
         if (!s) return false;
         const q = searchTerm.toLowerCase().trim();
-        const payType = (s.paymentType || s.customer || 'Cash').trim();
+        const payType = (s.paymentType || 'Cash').trim();
+        const custName = (s.customer || '').trim();
 
-        // 1. Search text filter
+        // 1. Search text filter (matches ID, customer, TIN, phone, voucher #, pay type, paint names)
         const matchesSearch = !q ||
           (s.id || '').toLowerCase().includes(q) ||
           payType.toLowerCase().includes(q) ||
+          custName.toLowerCase().includes(q) ||
+          (s.customerTin || '').toLowerCase().includes(q) ||
+          (s.customerPhone || '').toLowerCase().includes(q) ||
+          (s.whtVoucherNumber || '').toLowerCase().includes(q) ||
           ((s.items || []).some(item => (item.productName || '').toLowerCase().includes(q)));
 
         // 2. Payment Type filter
@@ -95,20 +105,32 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
           matchesPayment = payType.toLowerCase() === selectedPayment.toLowerCase();
         }
 
-        // 3. Date / Period filter
-        let matchesPeriod = true;
-        const saleDate = s.localDate || (s.timestamp ? s.timestamp.split('T')[0] : '');
-
-        if (filterMode === 'DAY') {
-          matchesPeriod = selectedDate ? saleDate === selectedDate : true;
-        } else if (filterMode === 'MONTH') {
-          matchesPeriod = selectedMonth ? saleDate.startsWith(selectedMonth) : true;
+        // 3. Withholding Voucher Filter
+        let matchesVoucher = true;
+        if (voucherFilter === 'PENDING') {
+          matchesVoucher = Boolean(s.isWithholding && s.whtVoucherStatus === 'pending');
+        } else if (voucherFilter === 'COLLECTED') {
+          matchesVoucher = Boolean(s.isWithholding && s.whtVoucherStatus === 'received');
+        } else if (voucherFilter === 'WHT_ALL') {
+          matchesVoucher = Boolean(s.isWithholding);
         }
 
-        return matchesSearch && matchesPayment && matchesPeriod;
+        // 4. Date / Period filter (Bypass period filter when viewing PENDING vouchers so older uncollected vouchers are never hidden!)
+        let matchesPeriod = true;
+        if (voucherFilter !== 'PENDING') {
+          const saleDate = s.localDate || (s.timestamp ? s.timestamp.split('T')[0] : '');
+
+          if (filterMode === 'DAY') {
+            matchesPeriod = selectedDate ? saleDate === selectedDate : true;
+          } else if (filterMode === 'MONTH') {
+            matchesPeriod = selectedMonth ? saleDate.startsWith(selectedMonth) : true;
+          }
+        }
+
+        return matchesSearch && matchesPayment && matchesVoucher && matchesPeriod;
       })
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }, [sales, searchTerm, selectedPayment, filterMode, selectedDate, selectedMonth]);
+  }, [sales, searchTerm, selectedPayment, voucherFilter, filterMode, selectedDate, selectedMonth]);
 
   const totalFilteredRevenue = useMemo(() => filteredSales.reduce((sum, s) => sum + s.total, 0), [filteredSales]);
   const totalFilteredUnits = useMemo(() => filteredSales.reduce((sum, s) => sum + s.totalItems, 0), [filteredSales]);
@@ -262,6 +284,45 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
           )}
         </div>
 
+        {/* Row 1.5: Quick Withholding Tax Voucher Filter Chips */}
+        <div className="voucher-filter-pills-bar mb-3">
+          <button
+            type="button"
+            className={`voucher-filter-chip ${voucherFilter === 'ALL' ? 'active' : ''}`}
+            onClick={() => setVoucherFilter('ALL')}
+          >
+            All Sales ({sales.length})
+          </button>
+          <button
+            type="button"
+            className={`voucher-filter-chip chip-pending ${voucherFilter === 'PENDING' ? 'active' : ''}`}
+            onClick={() => {
+              setVoucherFilter('PENDING');
+              if (filterMode !== 'ALL') setFilterMode('ALL');
+            }}
+          >
+            <span>⏳ Pending Vouchers</span>
+            {pendingVouchersCount > 0 && <span className="chip-badge-warning">{pendingVouchersCount}</span>}
+          </button>
+          <button
+            type="button"
+            className={`voucher-filter-chip chip-collected ${voucherFilter === 'COLLECTED' ? 'active' : ''}`}
+            onClick={() => setVoucherFilter('COLLECTED')}
+          >
+            <span>✓ Collected Vouchers</span>
+            {collectedVouchersCount > 0 && <span className="chip-badge-success">{collectedVouchersCount}</span>}
+          </button>
+          {totalWhtCount > 0 && (
+            <button
+              type="button"
+              className={`voucher-filter-chip ${voucherFilter === 'WHT_ALL' ? 'active' : ''}`}
+              onClick={() => setVoucherFilter('WHT_ALL')}
+            >
+              <span>📑 All 3% WHT ({totalWhtCount})</span>
+            </button>
+          )}
+        </div>
+
         {/* Landing Control Row: Date quick-picker + View in Details button */}
         <div className="sales-landing-row">
           {/* Quick Date Switcher for Landing View */}
@@ -393,30 +454,37 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
               )}
             </div>
 
-            {/* Payment Type Filter (Cash, CBE, Telebirr, Sinke, Coop, Awash, Dashen) */}
+            {/* Tax / Withholding Voucher Filter */}
             <div className="sales-filter-row">
               <div className="filter-group">
                 <span className="filter-group-label">Tax / WHT:</span>
                 <button
                   type="button"
-                  className={`filter-toggle-btn ${whtFilter === 'ALL' ? 'active' : ''}`}
-                  onClick={() => setWhtFilter('ALL')}
+                  className={`filter-toggle-btn ${voucherFilter === 'ALL' ? 'active' : ''}`}
+                  onClick={() => setVoucherFilter('ALL')}
                 >
                   All Invoices
                 </button>
                 <button
                   type="button"
-                  className={`filter-toggle-btn ${whtFilter === 'WHT_ONLY' ? 'active' : ''}`}
-                  onClick={() => setWhtFilter('WHT_ONLY')}
+                  className={`filter-toggle-btn ${voucherFilter === 'PENDING' ? 'active' : ''}`}
+                  onClick={() => setVoucherFilter('PENDING')}
                 >
-                  📋 3% WHT Sales
+                  ⏳ Pending Vouchers {pendingVouchersCount > 0 && `(${pendingVouchersCount})`}
                 </button>
                 <button
                   type="button"
-                  className={`filter-toggle-btn ${whtFilter === 'PENDING_ONLY' ? 'active' : ''}`}
-                  onClick={() => setWhtFilter('PENDING_ONLY')}
+                  className={`filter-toggle-btn ${voucherFilter === 'COLLECTED' ? 'active' : ''}`}
+                  onClick={() => setVoucherFilter('COLLECTED')}
                 >
-                  ⏳ Pending Vouchers
+                  ✓ Collected {collectedVouchersCount > 0 && `(${collectedVouchersCount})`}
+                </button>
+                <button
+                  type="button"
+                  className={`filter-toggle-btn ${voucherFilter === 'WHT_ALL' ? 'active' : ''}`}
+                  onClick={() => setVoucherFilter('WHT_ALL')}
+                >
+                  📋 All 3% WHT
                 </button>
               </div>
             </div>
@@ -483,6 +551,7 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
                   <tr>
                     <th>Receipt #</th>
                     <th>Date & Time</th>
+                    <th>Customer</th>
                     <th>Payment Type</th>
                     <th>Items Breakdown</th>
                     <th>Total Units</th>
@@ -494,7 +563,7 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
                   {filteredSales.map((sale) => {
                     const dt = new Date(sale.timestamp);
                     const isRecent = Boolean(sale.isRecent);
-                    const payType = sale.paymentType || sale.customer || 'Cash';
+                    const payType = sale.paymentType || 'Cash';
                     return (
                       <tr key={sale.id} className={isRecent ? 'row-recently-recorded' : ''}>
                         <td>
@@ -538,6 +607,19 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
                             <div>{dt.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</div>
                             <div className="text-xs text-muted">{dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                           </div>
+                        </td>
+                        <td>
+                          <div className="text-sm font-semibold">{sale.customer || 'Cash Walk-in'}</div>
+                          {sale.customerTin && (
+                            <div className="text-xs text-muted">TIN: {sale.customerTin}</div>
+                          )}
+                          {sale.customerPhone && (
+                            <div className="text-xs" style={{ marginTop: '2px' }}>
+                              <a href={`tel:${sale.customerPhone}`} style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>
+                                📞 {sale.customerPhone}
+                              </a>
+                            </div>
+                          )}
                         </td>
                         <td>
                           <span className="badge-pill badge-neutral font-semibold">{payType}</span>
@@ -591,17 +673,58 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
                   <div key={sale.id} className={`mobile-sale-card ${isRecent ? 'card-recently-recorded' : ''}`}>
                     <div className="msc-header">
                       <div>
-                        <strong className="msc-id font-mono">{sale.id}</strong>
-                        {isRecent && (
-                          <span className="badge-pill badge-healthy ml-2" style={{ fontSize: '10px', padding: '0.15rem 0.4rem' }}>
-                            NEW
-                          </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                          <strong className="msc-id font-mono">{sale.id}</strong>
+                          {isRecent && (
+                            <span className="badge-pill badge-healthy" style={{ fontSize: '9px', padding: '0.1rem 0.35rem' }}>
+                              NEW
+                            </span>
+                          )}
+                          {sale.isWithholding && (
+                            <span className="badge-pill badge-warning" style={{ fontSize: '9px', padding: '0.1rem 0.35rem' }}>
+                              3% WHT
+                            </span>
+                          )}
+                        </div>
+                        <span className="msc-customer font-bold text-main" style={{ display: 'block', marginTop: '3px' }}>
+                          👤 {sale.customer || 'Cash Walk-in'}
+                        </span>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', marginTop: '2px' }}>
+                          <span className="badge-pill badge-neutral" style={{ fontSize: '10px' }}>{sale.paymentType || 'Cash'}</span>
+                          {sale.customerTin && <span className="text-xs text-muted">TIN: {sale.customerTin}</span>}
+                        </div>
+                        {sale.customerPhone && (
+                          <div style={{ marginTop: '3px' }}>
+                            <a href={`tel:${sale.customerPhone}`} className="text-xs text-primary font-bold" onClick={(e) => e.stopPropagation()} style={{ textDecoration: 'none' }}>
+                              📞 {sale.customerPhone}
+                            </a>
+                          </div>
                         )}
-                        <span className="msc-customer font-semibold">{sale.paymentType || sale.customer || 'Cash'}</span>
                       </div>
                       <div className="msc-time">
                         <span>{dt.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                         <small>{dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
+                        {sale.isWithholding && (
+                          <div style={{ marginTop: '4px' }}>
+                            {sale.whtVoucherStatus === 'received' ? (
+                              <span className="badge-pill badge-healthy" style={{ fontSize: '10px', color: '#166534', background: '#dcfce7' }}>✓ Voucher On File</span>
+                            ) : (
+                              <button
+                                type="button"
+                                className="badge-pill badge-warning"
+                                style={{ fontSize: '10px', cursor: 'pointer', border: 'none' }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingVoucherSale(sale);
+                                  setInputVoucherNo(sale.whtVoucherNumber || '');
+                                  setInputVoucherStatus('received');
+                                }}
+                              >
+                                ⏳ Pending Voucher ✎
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -656,9 +779,28 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
                   <div>
                     <span className="text-muted text-xs">Payment Method:</span>
                     <strong className="badge-pill badge-neutral" style={{ display: 'inline-block', marginTop: '2px' }}>
-                      {selectedSale.paymentType || selectedSale.customer || 'Cash'}
+                      {selectedSale.paymentType || 'Cash'}
                     </strong>
                   </div>
+                </div>
+
+                <div className="receipt-customer-block">
+                  <div className="receipt-customer-line">
+                    <span className="text-muted text-xs">Customer Name:</span>
+                    <strong className="text-xs">{selectedSale.customer || 'Cash Walk-in'}</strong>
+                  </div>
+                  {selectedSale.customerTin && (
+                    <div className="receipt-customer-line">
+                      <span className="text-muted text-xs">TIN Number:</span>
+                      <strong className="text-xs font-mono">{selectedSale.customerTin}</strong>
+                    </div>
+                  )}
+                  {selectedSale.customerPhone && (
+                    <div className="receipt-customer-line">
+                      <span className="text-muted text-xs">Contact Phone:</span>
+                      <strong className="text-xs font-mono">{selectedSale.customerPhone}</strong>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -700,9 +842,27 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
                   <span>Tax (Included 15% VAT):</span>
                   <span>{formatCurrency(selectedSale.total - selectedSale.total / 1.15)}</span>
                 </div>
+                {selectedSale.isWithholding && (
+                  <>
+                    <div className="receipt-total-row">
+                      <span>Gross Invoice:</span>
+                      <span>{formatCurrency(selectedSale.grossTotal || selectedSale.total)}</span>
+                    </div>
+                    <div className="receipt-total-row text-warning font-semibold">
+                      <span>Less 3% Withholding Tax:</span>
+                      <span>-{formatCurrency(selectedSale.withholdingAmount)}</span>
+                    </div>
+                    <div className="receipt-total-row">
+                      <span>WHT Voucher Status:</span>
+                      <span className={selectedSale.whtVoucherStatus === 'received' ? 'text-success font-bold' : 'text-warning font-bold'}>
+                        {selectedSale.whtVoucherStatus === 'received' ? `✓ Voucher ${selectedSale.whtVoucherNumber || 'Received'}` : '⏳ Pending Collection'}
+                      </span>
+                    </div>
+                  </>
+                )}
                 <div className="receipt-total-row grand-total">
-                  <strong>Total Paid:</strong>
-                  <strong>{formatCurrency(selectedSale.total)}</strong>
+                  <strong>{selectedSale.isWithholding ? 'Net Amount Paid:' : 'Total Paid:'}</strong>
+                  <strong>{formatCurrency(selectedSale.isWithholding ? selectedSale.netPayable : selectedSale.total)}</strong>
                 </div>
               </div>
 
@@ -711,13 +871,21 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
               </div>
             </div>
 
-            <div className="modal-actions">
+            <div className="modal-actions" style={{ display: 'flex', gap: '8px' }}>
               <button
                 type="button"
-                className="btn-outline-sm w-full"
+                className="btn-outline-sm flex-1"
                 onClick={() => setSelectedSale(null)}
               >
                 Close Receipt
+              </button>
+              <button
+                type="button"
+                className="btn-primary-sm flex-1"
+                onClick={() => printSaleReceipt({ sale: selectedSale, shopName: currentShop?.name || 'My Jotun Store' })}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              >
+                <span>🖨️ Print / Save PDF</span>
               </button>
             </div>
           </div>

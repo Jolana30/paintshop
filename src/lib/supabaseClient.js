@@ -239,6 +239,7 @@ export const supabaseApi = {
       id: sale.id,
       customer: sale.customer || 'Cash Walk-in',
       customer_tin: sale.customerTin || null,
+      customer_phone: sale.customerPhone || null,
       payment_type: sale.paymentType || 'Cash',
       total: sale.total,
       total_items: sale.totalItems,

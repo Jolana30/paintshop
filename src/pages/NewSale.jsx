@@ -20,10 +20,11 @@ export default function NewSale({ setActiveTab }) {
   const [paymentType, setPaymentType] = useState('Cash'); // 'Cash', 'CBE', 'Sinke', 'Coop', 'Awash', 'Dashen'
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
-  // Ethiopian 3% Withholding Tax (WHT) State
-  const [isWithholding, setIsWithholding] = useState(false);
+  // Customer & Ethiopian 3% Withholding Tax (WHT) State
   const [customerName, setCustomerName] = useState('');
   const [customerTin, setCustomerTin] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [isWithholding, setIsWithholding] = useState(false);
   const [whtVoucherNumber, setWhtVoucherNumber] = useState('');
   const [whtVoucherStatus, setWhtVoucherStatus] = useState('pending'); // 'received' | 'pending'
 
@@ -232,6 +233,14 @@ export default function NewSale({ setActiveTab }) {
       alert("Please add at least 1 product to the sale.");
       return;
     }
+    if (!customerName.trim()) {
+      showToast("Customer Name is required for every receipt. Enter a name or tap '+ Walk-in'.", 'warning');
+      return;
+    }
+    if (isWithholding && isWhtEligible && !customerPhone.trim()) {
+      showToast("Contact phone number is required for withholding voucher follow-up.", 'warning');
+      return;
+    }
     if (isSubmitting) return;
 
     if (isWithholding && !isWhtEligible) {
@@ -246,9 +255,10 @@ export default function NewSale({ setActiveTab }) {
         withholdingRate: 3.0,
         withholdingAmount: cartWhtAmount,
         netPayable: cartNetPayable,
-        customerName: customerName.trim() || ((isWithholding && isWhtEligible) ? 'Corporate Contractor' : 'Cash Walk-in'),
-        customerTin: customerTin.trim(),
-        whtVoucherNumber: whtVoucherNumber.trim(),
+        customerName: customerName.trim(),
+        customerTin: customerTin.trim() || null,
+        customerPhone: customerPhone.trim() || null,
+        whtVoucherNumber: whtVoucherNumber.trim() || null,
         whtVoucherStatus: (isWithholding && isWhtEligible) ? whtVoucherStatus : 'not_applicable'
       });
 
@@ -258,6 +268,7 @@ export default function NewSale({ setActiveTab }) {
         setIsWithholding(false);
         setCustomerName('');
         setCustomerTin('');
+        setCustomerPhone('');
         setWhtVoucherNumber('');
         setWhtVoucherStatus('pending');
         setIsMobileCartOpen(false);
@@ -572,6 +583,44 @@ export default function NewSale({ setActiveTab }) {
             {/* Cart Summary & Direct Record Sale Action */}
             {cart.length > 0 && (
               <form onSubmit={handleRecordSale} className="cart-footer">
+                {/* Mandatory Customer Name & Optional TIN */}
+                <div className="cart-customer-section mb-3">
+                  <div className="form-group mb-2">
+                    <div className="flex-between-center mb-1">
+                      <label className="text-xs font-bold text-main">
+                        Customer Name <span className="text-danger">*</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="btn-quick-walkin"
+                        onClick={() => setCustomerName('Walk-in Customer')}
+                        title="Set Customer Name to Walk-in Customer"
+                      >
+                        + Walk-in
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Abebe Kebede or Sunshine PLC"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="form-input form-input-sm"
+                    />
+                  </div>
+
+                  <div className="form-group mb-2">
+                    <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Customer TIN (Optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 0019283746 (10 digits)"
+                      value={customerTin}
+                      onChange={(e) => setCustomerTin(e.target.value)}
+                      className="form-input form-input-sm"
+                    />
+                  </div>
+                </div>
+
                 <div className="form-group mb-3">
                   <label className="form-label" style={{ fontWeight: 700, marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>Payment Type:</span>
@@ -609,38 +658,28 @@ export default function NewSale({ setActiveTab }) {
                     {isWithholding && (
                       <div className="wht-fields-container">
                         <div className="form-group mb-2">
-                          <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Client / Company Name *</label>
+                          <label className="text-xs font-bold text-warning-dark" style={{ display: 'block', marginBottom: '3px' }}>
+                            📞 Contact Phone for Voucher Follow-up <span className="text-danger">*</span>
+                          </label>
                           <input
-                            type="text"
+                            type="tel"
                             required={isWithholding}
-                            placeholder="e.g. Sunshine Construction PLC"
-                            value={customerName}
-                            onChange={(e) => setCustomerName(e.target.value)}
+                            placeholder="e.g. 0911 234 567"
+                            value={customerPhone}
+                            onChange={(e) => setCustomerPhone(e.target.value)}
                             className="form-input form-input-sm"
                           />
                         </div>
 
-                        <div className="form-grid-2 mb-2">
-                          <div>
-                            <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Customer TIN (10-digits)</label>
-                            <input
-                              type="text"
-                              placeholder="0012345678"
-                              value={customerTin}
-                              onChange={(e) => setCustomerTin(e.target.value)}
-                              className="form-input form-input-sm"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>WHT Voucher Serial #</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. WHT-9481"
-                              value={whtVoucherNumber}
-                              onChange={(e) => setWhtVoucherNumber(e.target.value)}
-                              className="form-input form-input-sm"
-                            />
-                          </div>
+                        <div className="form-group mb-2">
+                          <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>WHT Voucher Serial # (Optional)</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. WHT-9481"
+                            value={whtVoucherNumber}
+                            onChange={(e) => setWhtVoucherNumber(e.target.value)}
+                            className="form-input form-input-sm"
+                          />
                         </div>
 
                         <div className="wht-status-pill-group">
@@ -857,8 +896,46 @@ export default function NewSale({ setActiveTab }) {
                 ))}
               </div>
 
+              {/* Customer Information in Mobile Drawer */}
+              <div className="cart-customer-section mb-3 mt-3">
+                <div className="form-group mb-2">
+                  <div className="flex-between-center mb-1">
+                    <label className="text-xs font-bold text-main">
+                      Customer Name <span className="text-danger">*</span>
+                    </label>
+                    <button
+                      type="button"
+                      className="btn-quick-walkin"
+                      onClick={() => setCustomerName('Walk-in Customer')}
+                      title="Set Customer Name to Walk-in Customer"
+                    >
+                      + Walk-in
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Abebe Kebede or Sunshine PLC"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="form-input form-input-sm"
+                  />
+                </div>
+
+                <div className="form-group mb-2">
+                  <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Customer TIN (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 0019283746 (10 digits)"
+                    value={customerTin}
+                    onChange={(e) => setCustomerTin(e.target.value)}
+                    className="form-input form-input-sm"
+                  />
+                </div>
+              </div>
+
               {/* Payment Type Grid in Mobile Drawer */}
-              <div className="form-group mb-3 mt-3">
+              <div className="form-group mb-3">
                 <label className="form-label" style={{ fontWeight: 700, marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Payment Type:</span>
                   <span className="badge-pill badge-primary" style={{ fontSize: '11px' }}>{paymentType}</span>
@@ -895,38 +972,28 @@ export default function NewSale({ setActiveTab }) {
                   {isWithholding && (
                     <div className="wht-fields-container">
                       <div className="form-group mb-2">
-                        <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Client / Company Name *</label>
+                        <label className="text-xs font-bold text-warning-dark" style={{ display: 'block', marginBottom: '3px' }}>
+                          📞 Contact Phone for Voucher Follow-up <span className="text-danger">*</span>
+                        </label>
                         <input
-                          type="text"
+                          type="tel"
                           required={isWithholding}
-                          placeholder="e.g. Sunshine Construction PLC"
-                          value={customerName}
-                          onChange={(e) => setCustomerName(e.target.value)}
+                          placeholder="e.g. 0911 234 567"
+                          value={customerPhone}
+                          onChange={(e) => setCustomerPhone(e.target.value)}
                           className="form-input form-input-sm"
                         />
                       </div>
 
-                      <div className="form-grid-2 mb-2">
-                        <div>
-                          <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>Customer TIN (10-digits)</label>
-                          <input
-                            type="text"
-                            placeholder="0012345678"
-                            value={customerTin}
-                            onChange={(e) => setCustomerTin(e.target.value)}
-                            className="form-input form-input-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>WHT Voucher Serial #</label>
-                          <input
-                            type="text"
-                            placeholder="e.g. WHT-9481"
-                            value={whtVoucherNumber}
-                            onChange={(e) => setWhtVoucherNumber(e.target.value)}
-                            className="form-input form-input-sm"
-                          />
-                        </div>
+                      <div className="form-group mb-2">
+                        <label className="text-xs text-muted" style={{ display: 'block', marginBottom: '3px' }}>WHT Voucher Serial # (Optional)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. WHT-9481"
+                          value={whtVoucherNumber}
+                          onChange={(e) => setWhtVoucherNumber(e.target.value)}
+                          className="form-input form-input-sm"
+                        />
                       </div>
 
                       <div className="wht-status-pill-group">
