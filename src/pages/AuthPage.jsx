@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useStock } from '../context/StockContext';
 import {
   PaintBucketIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  EyeIcon,
+  EyeOffIcon
 } from '../components/Icons';
 
 export default function AuthPage() {
@@ -179,7 +181,7 @@ export default function AuthPage() {
               <span className="detail-val">{pendingShop.phone}</span>
             </div>
             <div className="detail-row">
-              <span className="detail-label">Personal / Store Email:</span>
+              <span className="detail-label">Personal Email:</span>
               <span className="detail-val">{pendingShop.email}</span>
             </div>
             <div className="detail-row">
@@ -345,11 +347,11 @@ export default function AuthPage() {
               </div>
 
               <div className="form-field">
-                <label className="field-label">Personal or Store Email</label>
+                <label className="field-label">Personal Email</label>
                 <input
                   type="email"
                   required
-                  placeholder="e.g. yourname@gmail.com or store@example.com"
+                  placeholder="name@gmail.com"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   className="field-input"
@@ -376,10 +378,11 @@ export default function AuthPage() {
                     type="button"
                     className="password-toggle-btn"
                     aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                    title={showLoginPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowLoginPassword(!showLoginPassword)}
                     tabIndex={-1}
                   >
-                    {showLoginPassword ? '👁️' : '👁️‍🗨️'}
+                    {showLoginPassword ? <EyeOffIcon size={19} /> : <EyeIcon size={19} />}
                   </button>
                 </div>
               </div>
@@ -484,11 +487,11 @@ export default function AuthPage() {
 
               <div className="form-grid-2">
                 <div className="form-field">
-                  <label className="field-label">Personal or Store Email *</label>
+                  <label className="field-label">Personal Email *</label>
                   <input
                     type="email"
                     required
-                    placeholder="e.g. yourname@gmail.com or store@example.com"
+                    placeholder="name@gmail.com"
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
                     className="field-input"
@@ -515,10 +518,11 @@ export default function AuthPage() {
                       type="button"
                       className="password-toggle-btn"
                       aria-label={showRegPassword ? 'Hide password' : 'Show password'}
+                      title={showRegPassword ? 'Hide password' : 'Show password'}
                       onClick={() => setShowRegPassword(!showRegPassword)}
                       tabIndex={-1}
                     >
-                      {showRegPassword ? '👁️' : '👁️‍🗨️'}
+                      {showRegPassword ? <EyeOffIcon size={19} /> : <EyeIcon size={19} />}
                     </button>
                   </div>
                 </div>

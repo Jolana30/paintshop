@@ -4188,23 +4188,32 @@
   transform: translateY(-50%);
   background: transparent;
   border: none;
-  font-size: 1.1rem;
   cursor: pointer;
-  padding: 0.35rem 0.5rem;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #64748b;
   border-radius: 6px;
-  transition: background 0.15s, color 0.15s;
+  transition: all 0.15s ease;
   user-select: none;
-  min-width: 36px;
-  min-height: 36px;
+  width: 34px;
+  height: 34px;
+  z-index: 2;
 }
 
 .password-toggle-btn:hover {
   background: #f1f5f9;
-  color: #1e293b;
+  color: #0f172a;
+}
+
+.password-toggle-btn:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.password-toggle-btn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
 }
 
 .btn-auth-submit {
