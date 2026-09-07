@@ -7,8 +7,8 @@
 
 import { isValidUUID, generateUUID } from '../utils/formatters';
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').trim();
-const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || 'https://bqdqotozxzzfoferagjr.supabase.co').trim();
+const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_z-B190KryqAKpJGTn1UInQ_WvzbwX4e').trim();
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
