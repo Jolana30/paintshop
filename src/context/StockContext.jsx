@@ -57,6 +57,27 @@ export function StockProvider({ children }) {
     return isSupabaseConfigured ? null : DEFAULT_DEMO_SHOPS[0];
   });
 
+  // Proactive Supabase Cloud Health Check
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    let isMounted = true;
+    const testCloud = async () => {
+      try {
+        const res = await supabaseApi.getMasterProducts();
+        if (isMounted && Array.isArray(res) && res.length > 0) {
+          setCloudStatus('connected');
+        }
+      } catch (err) {
+        console.warn('Initial Supabase ping notice:', err);
+        if (isMounted) setCloudStatus('error');
+      }
+    };
+
+    testCloud();
+    return () => { isMounted = false; };
+  }, []);
+
   // Hydrate all registered shops from Supabase if connected
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -82,6 +103,18 @@ export function StockProvider({ children }) {
               });
             });
             return Array.from(map.values());
+          });
+
+          // Proactively synchronize active shop status if approved in cloud
+          setCurrentShop(prevCurrent => {
+            if (!prevCurrent) return prevCurrent;
+            const match = remoteShops.find(s => s.id === prevCurrent.id || (s.email && prevCurrent.email && s.email.toLowerCase() === prevCurrent.email.toLowerCase()));
+            if (match && match.status && match.status !== prevCurrent.status) {
+              const updated = { ...prevCurrent, status: match.status };
+              localStorage.setItem('paintflow_current_shop', JSON.stringify(updated));
+              return updated;
+            }
+            return prevCurrent;
           });
         }
       } catch (err) {
@@ -442,20 +475,32 @@ export function StockProvider({ children }) {
       }
 
       setAllShops(prev => prev.map(s => s.id === targetShopId ? { ...s, status: 'active' } : s));
-      if (currentShop && currentShop.id === targetShopId) {
+      const targetShop = allShops.find(s => s.id === targetShopId);
+      const isCurrentSession = currentShop && (currentShop.id === targetShopId || (currentShop.email && targetShop?.email && currentShop.email.toLowerCase() === targetShop.email.toLowerCase()));
+
+      if (isCurrentSession) {
         const activeShop = { ...currentShop, status: 'active' };
         setCurrentShop(activeShop);
         localStorage.setItem('paintflow_current_shop', JSON.stringify(activeShop));
+        if (isSupabaseConfigured && !isDemoShop(activeShop)) {
+          await hydrateCloudData(activeShop);
+        }
       }
       showToast("Store approved and activated! Ready for counter sales.", "success");
       return true;
     } catch (err) {
       console.error('Failed to approve shop:', err);
       setAllShops(prev => prev.map(s => s.id === targetShopId ? { ...s, status: 'active' } : s));
-      if (currentShop && currentShop.id === targetShopId) {
+      const targetShop = allShops.find(s => s.id === targetShopId);
+      const isCurrentSession = currentShop && (currentShop.id === targetShopId || (currentShop.email && targetShop?.email && currentShop.email.toLowerCase() === targetShop.email.toLowerCase()));
+
+      if (isCurrentSession) {
         const activeShop = { ...currentShop, status: 'active' };
         setCurrentShop(activeShop);
         localStorage.setItem('paintflow_current_shop', JSON.stringify(activeShop));
+        if (isSupabaseConfigured && !isDemoShop(activeShop)) {
+          await hydrateCloudData(activeShop);
+        }
       }
       showToast("Store activated and ready for counter sales.", "success");
       return true;
@@ -793,11 +838,74 @@ export function StockProvider({ children }) {
   };
 
   const refreshData = async () => {
-    if (isSupabaseConfigured && currentShop?.status === 'active' && !isDemoShop(currentShop)) {
-      await hydrateCloudData(currentShop);
-      showToast("Cloud catalog and sales synchronized!", "success");
-    } else {
-      showToast("Catalog and sales up to date!", "success");
+    if (!isSupabaseConfigured) {
+      showToast("Local branch mode: Supabase cloud not configured.", "info");
+      setCloudStatus('offline');
+      return;
+    }
+
+    setCloudStatus('connecting');
+    showToast("Connecting to Supabase Cloud...", "info");
+
+    try {
+      // 1. Verify REST API connection to official master catalog
+      const masterCheck = await supabaseApi.getMasterProducts();
+      if (!Array.isArray(masterCheck) || masterCheck.length === 0) {
+        throw new Error("Unable to reach cloud catalog");
+      }
+
+      // 2. Fetch remote shops to detect any recent approvals
+      let updatedAllShops = allShops;
+      try {
+        const remoteShops = await supabaseApi.getAllShops();
+        if (Array.isArray(remoteShops) && remoteShops.length > 0) {
+          const map = new Map();
+          DEFAULT_DEMO_SHOPS.forEach(s => map.set(s.id, s));
+          allShops.forEach(s => map.set(s.id, s));
+          remoteShops.forEach(s => {
+            map.set(s.id, {
+              id: s.id,
+              name: s.name,
+              owner_name: s.owner_name,
+              phone: s.phone,
+              city_address: s.city_address,
+              tin_number: s.tin_number,
+              email: s.email,
+              status: s.status || 'pending_approval',
+              created_at: s.created_at
+            });
+          });
+          updatedAllShops = Array.from(map.values());
+          setAllShops(updatedAllShops);
+        }
+      } catch (shopErr) {
+        console.warn('Could not sync remote shops during refresh:', shopErr);
+      }
+
+      // 3. Resolve current shop status if it was approved
+      let activeShop = currentShop;
+      if (currentShop) {
+        const match = updatedAllShops.find(s => s.id === currentShop.id || (s.email && currentShop.email && s.email.toLowerCase() === currentShop.email.toLowerCase()));
+        if (match && match.status === 'active' && currentShop.status !== 'active') {
+          activeShop = { ...currentShop, status: 'active' };
+          setCurrentShop(activeShop);
+          localStorage.setItem('paintflow_current_shop', JSON.stringify(activeShop));
+        }
+      }
+
+      // 4. Hydrate cloud data if store is active
+      if (activeShop && activeShop.status === 'active' && !isDemoShop(activeShop)) {
+        await hydrateCloudData(activeShop);
+        setCloudStatus('connected');
+        showToast("Supabase Cloud synchronized! Inventory and sales are live.", "success");
+      } else {
+        setCloudStatus('connected');
+        showToast("Supabase Cloud is live and connected!", "success");
+      }
+    } catch (err) {
+      console.error('Refresh data error:', err);
+      setCloudStatus('error');
+      showToast(`Cloud connection warning: ${err.message || 'Offline'}`, "error");
     }
   };
 

@@ -38,6 +38,13 @@ export async function fetchFromSupabase(endpoint, options = {}) {
   const response = await fetch(url, { ...options, headers });
 
   if (!response.ok) {
+    if (response.status === 401 && token !== SUPABASE_ANON_KEY) {
+      console.warn('[Supabase Auth] Expired or invalid token detected. Purging stale auth and retrying with anon key.');
+      localStorage.removeItem('paintflow_auth_token');
+      localStorage.removeItem('paintflow_refresh_token');
+      return fetchFromSupabase(endpoint, { ...options, token: SUPABASE_ANON_KEY });
+    }
+
     const errText = await response.text();
     let errMsg = `Supabase request failed with HTTP ${response.status}`;
     try {

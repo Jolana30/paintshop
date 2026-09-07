@@ -47,9 +47,18 @@ export default function Navigation({ activeTab, setActiveTab }) {
           </div>
         </div>
 
-        <div className={`sidebar-device-badge ${cloudStatus === 'connected' ? 'badge-cloud-online' : 'badge-cloud-local'}`}>
+        <div 
+          className={`sidebar-device-badge ${cloudStatus === 'connected' ? 'badge-cloud-online' : 'badge-cloud-local'}`}
+          onClick={refreshData}
+          title="Click to test & sync Supabase Cloud connection"
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+        >
           <span className={`device-indicator ${cloudStatus === 'connected' ? 'indicator-online' : 'indicator-local'}`}></span>
-          <span>{cloudStatus === 'connected' ? '☁️ Supabase Cloud (Live)' : '⚡ Storage: Local Branch'}</span>
+          <span>
+            {cloudStatus === 'connected' && '☁️ Supabase Cloud (Live)'}
+            {cloudStatus === 'connecting' && '🔄 Connecting...'}
+            {cloudStatus !== 'connected' && cloudStatus !== 'connecting' && '⚡ Storage: Local (Click to Sync)'}
+          </span>
         </div>
 
         <nav className="sidebar-nav">
@@ -135,12 +144,15 @@ export default function Navigation({ activeTab, setActiveTab }) {
             ⎋
           </button>
 
-          <span
+          <button
+            type="button"
             className={`mobile-cloud-pill ${cloudStatus === 'connected' ? 'cloud-online' : 'cloud-local'}`}
-            title={cloudStatus === 'connected' ? 'Connected to Supabase Cloud' : 'Running in Offline Local Mode'}
+            onClick={refreshData}
+            title="Tap to test & sync Supabase Cloud connection"
+            style={{ border: 'none', cursor: 'pointer' }}
           >
-            {cloudStatus === 'connected' ? '☁️ Live' : '⚡ Local'}
-          </span>
+            {cloudStatus === 'connected' ? '☁️ Live' : cloudStatus === 'connecting' ? '🔄 Sync' : '⚡ Local'}
+          </button>
 
           {lowCount > 0 && (
             <button
