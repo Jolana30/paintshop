@@ -347,7 +347,7 @@ export default function AuthPage() {
               </div>
 
               <div className="form-field">
-                <label className="field-label">Personal Email</label>
+                <label className="field-label">Email</label>
                 <input
                   type="email"
                   required
