@@ -5,7 +5,7 @@ import {
   CheckCircleIcon
 } from '../components/Icons';
 
-export default function AuthPage({ onOpenAdmin }) {
+export default function AuthPage() {
   const {
     currentShop,
     loginShop,
@@ -238,25 +238,6 @@ export default function AuthPage({ onOpenAdmin }) {
             >
               ⎋ Sign Out
             </button>
-
-            {/* Discreet Platform Administrator Access */}
-            <div style={{ textAlign: 'center', marginTop: '1.25rem' }}>
-              <button
-                type="button"
-                onClick={() => onOpenAdmin ? onOpenAdmin() : (window.location.hash = 'admin')}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#94a3b8',
-                  fontSize: '0.75rem',
-                  cursor: 'pointer',
-                  padding: '4px 8px'
-                }}
-                title="Platform Administrator Console"
-              >
-                🔐 Platform Administration Console
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -577,28 +558,6 @@ export default function AuthPage({ onOpenAdmin }) {
             <p>
               <strong>Disclaimer:</strong> PaintFlow is an independent point-of-sale and inventory management platform created for paint retailers and dealers. Jotun, Fenomastic, and Jotashield are registered trademarks of Jotun A/S. PaintFlow is not affiliated with, sponsored by, or endorsed by Jotun A/S.
             </p>
-          </div>
-
-          {/* Discreet Platform Administrator Access */}
-          <div style={{ textAlign: 'center', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0' }}>
-            <button
-              type="button"
-              onClick={() => onOpenAdmin ? onOpenAdmin() : (window.location.hash = 'admin')}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#94a3b8',
-                fontSize: '0.75rem',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '4px 8px'
-              }}
-              title="Platform Administrator Portal"
-            >
-              <span>🔐 Platform Admin Console</span>
-            </button>
           </div>
         </div>
       </div>

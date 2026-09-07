@@ -34,7 +34,7 @@ export default function AdminPage({ onBackToApp }) {
       setAuthError('');
       showToast('Administrator Console Unlocked', 'success');
     } else {
-      setAuthError('Incorrect Master PIN. (Default: admin2026)');
+      setAuthError('Incorrect Master PIN. Access denied.');
     }
   };
 
@@ -101,7 +101,7 @@ export default function AdminPage({ onBackToApp }) {
                 type="password"
                 required
                 autoFocus
-                placeholder="Enter PIN (admin2026)"
+                placeholder="Enter Master Security PIN"
                 value={adminPin}
                 onChange={(e) => { setAdminPin(e.target.value); setAuthError(''); }}
                 className="field-input"

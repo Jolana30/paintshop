@@ -95,7 +95,7 @@ function MainLayout() {
   if (!currentShop || currentShop.status === 'pending_approval') {
     return (
       <div className="auth-shell">
-        <AuthPage onOpenAdmin={() => setActiveTab('admin')} />
+        <AuthPage />
         {toast && (
           <div className={`toast-notification toast-${toast.type}`}>
             <div className="toast-dot"></div>
