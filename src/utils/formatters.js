@@ -24,3 +24,19 @@ export const generateUUID = () => {
     return v.toString(16);
   });
 };
+
+// Validate standard UUID format to prevent PostgreSQL type cast errors
+export const isValidUUID = (str) => {
+  if (typeof str !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim());
+};
+
+// Check if a shop is a local demo shop (to bypass remote PostgreSQL UUID constraints)
+export const isDemoShop = (shop) => {
+  if (!shop) return false;
+  if (shop.isDemo) return true;
+  if (typeof shop.id === 'string' && (shop.id.startsWith('shop-demo') || !isValidUUID(shop.id))) {
+    return true;
+  }
+  return false;
+};

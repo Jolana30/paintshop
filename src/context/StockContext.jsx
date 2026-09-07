@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { initialProducts, initialSales, initialMovements } from '../data/initialProducts';
 import { supabaseApi, supabaseAuth, isSupabaseConfigured } from '../lib/supabaseClient';
-import { formatCurrency, getLocalDateString, generateUUID } from '../utils/formatters';
+import { formatCurrency, getLocalDateString, generateUUID, isDemoShop } from '../utils/formatters';
 
 const StockContext = createContext(null);
 
@@ -15,7 +15,8 @@ const DEFAULT_DEMO_SHOPS = [
     city_address: 'Bole Medhanialem, Addis Ababa',
     tin_number: '0019283746',
     email: 'bole@jotunshop.et',
-    status: 'active'
+    status: 'active',
+    isDemo: true
   },
   {
     id: 'shop-demo-merkato',
@@ -25,7 +26,8 @@ const DEFAULT_DEMO_SHOPS = [
     city_address: 'Merkato Military Terra, Addis Ababa',
     tin_number: '0048291038',
     email: 'merkato@jotunshop.et',
-    status: 'active'
+    status: 'active',
+    isDemo: true
   }
 ];
 
@@ -90,7 +92,7 @@ export function StockProvider({ children }) {
 
   // S-05: Authoritative Cloud Data Hydration
   const hydrateCloudData = useCallback(async (shop) => {
-    if (!isSupabaseConfigured || !shop?.id || shop.status !== 'active') return;
+    if (!isSupabaseConfigured || !shop?.id || shop.status !== 'active' || isDemoShop(shop)) return;
 
     try {
       await Promise.resolve();
@@ -212,7 +214,7 @@ export function StockProvider({ children }) {
       await Promise.resolve();
       if (isCancelled) return;
 
-      if (isSupabaseConfigured && currentShop.status === 'active') {
+      if (isSupabaseConfigured && currentShop.status === 'active' && !isDemoShop(currentShop)) {
         await hydrateCloudData(currentShop);
       } else {
         const savedProds = localStorage.getItem(`paintflow_products_${currentShop.id}`);
@@ -223,7 +225,7 @@ export function StockProvider({ children }) {
 
         const savedMovs = localStorage.getItem(`paintflow_movements_${currentShop.id}`);
         setMovements(savedMovs ? JSON.parse(savedMovs) : initialMovements);
-        setCloudStatus(isSupabaseConfigured ? 'connected' : 'offline');
+        setCloudStatus(isSupabaseConfigured && !isDemoShop(currentShop) ? 'connected' : 'offline');
       }
     };
 
@@ -259,12 +261,25 @@ export function StockProvider({ children }) {
 
     // Mock override passed from preset buttons
     if (mockShopOverride) {
-      setCurrentShop(mockShopOverride);
+      const demoShop = { ...mockShopOverride, isDemo: true };
+      setCurrentShop(demoShop);
       setAllShops(prev => {
-        const exists = prev.find(s => s.id === mockShopOverride.id);
-        return exists ? prev : [mockShopOverride, ...prev];
+        const exists = prev.find(s => s.id === demoShop.id);
+        return exists ? prev : [demoShop, ...prev];
       });
-      showToast(`Logged into ${mockShopOverride.name}!`, 'success');
+      showToast(`Logged into ${demoShop.name}! (Demo Mode)`, 'success');
+      return true;
+    }
+
+    // Check if logging into a pre-seeded demo account (e.g. bole@jotunshop.et or merkato@jotunshop.et)
+    const demoFound = DEFAULT_DEMO_SHOPS.find(s => s.email.toLowerCase() === email.toLowerCase());
+    if (demoFound && (!isSupabaseConfigured || password === 'demo123')) {
+      setCurrentShop(demoFound);
+      setAllShops(prev => {
+        const exists = prev.find(s => s.id === demoFound.id);
+        return exists ? prev : [demoFound, ...prev];
+      });
+      showToast(`Welcome back, ${demoFound.name}! (Demo Mode)`, 'success');
       return true;
     }
 
@@ -435,7 +450,7 @@ export function StockProvider({ children }) {
       isCustom: true
     };
 
-    if (isSupabaseConfigured && currentShop) {
+    if (isSupabaseConfigured && currentShop && !isDemoShop(currentShop)) {
       try {
         await supabaseApi.addCustomProduct(currentShop.id, newItem);
       } catch (err) {
@@ -462,57 +477,54 @@ export function StockProvider({ children }) {
         return false;
       }
       if (prod.stock < item.quantity) {
-        showToast(`Insufficient stock for ${prod.name}! Available: ${prod.stock}, Requested: ${item.quantity}`, 'error');
+        showToast(`Insufficient stock for "${prod.name}" (${prod.size}). Available: ${prod.stock}, Requested: ${item.quantity}`, 'error');
         return false;
       }
     }
 
+    const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    const grossTotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+    // 3% Withholding Tax calculations (applies on grossTotal > 20,000 ETB when toggled)
+    const isWht = Boolean(withholdingDetails?.isWithholding && grossTotal >= 20000);
+    const whtRate = isWht ? 3.0 : 0;
+    const whtAmount = isWht ? Math.round(grossTotal * 0.03 * 100) / 100 : 0;
+    const netPayable = isWht ? Math.round((grossTotal - whtAmount) * 100) / 100 : grossTotal;
+
     const saleId = 'SALE-' + generateUUID();
-    const now = new Date().toISOString();
-    const newMovements = [];
+    const now = new Date();
 
-    // Prepare updated products and movement records
-    const updatedProducts = products.map(p => {
-      const inCart = cartItems.find(item => item.productId === p.id);
-      if (inCart) {
-        const prev = p.stock;
-        const next = p.stock - inCart.quantity;
-
-        newMovements.push({
-          id: 'MOV-' + generateUUID(),
-          productId: p.id,
-          productName: p.name,
-          type: 'SALE',
-          quantity: -inCart.quantity,
-          previousStock: prev,
-          newStock: next,
-          reference: saleId,
-          timestamp: now
-        });
-
-        return { ...p, stock: next };
+    // Deduct stock locally
+    const updatedProducts = products.map(prod => {
+      const cartItem = cartItems.find(ci => ci.productId === prod.id);
+      if (cartItem) {
+        return { ...prod, stock: prod.stock - cartItem.quantity };
       }
-      return p;
+      return prod;
     });
 
-    const grossTotal = cartItems.reduce((sum, item) => sum + item.subtotal, 0);
-    const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-    const finalPayment = paymentType || "Cash";
+    // Record stock movements
+    const newMovements = cartItems.map(item => {
+      const prod = products.find(p => p.id === item.productId);
+      const prev = prod ? prod.stock : 0;
+      return {
+        id: 'MOV-' + generateUUID(),
+        productId: item.productId,
+        productName: item.productName,
+        type: 'SALE',
+        quantity: -item.quantity,
+        previousStock: prev,
+        newStock: prev - item.quantity,
+        reference: `Sale #${saleId.slice(-8)}`,
+        timestamp: now.toISOString()
+      };
+    });
 
-    // Ethiopian 3% Withholding Tax computation (requires minimum 20,000 ETB gross invoice)
-    const isWhtRequested = Boolean(withholdingDetails?.isWithholding);
-    if (isWhtRequested && grossTotal < 20000) {
-      showToast('Withholding tax (3%) requires a minimum transaction total of 20,000 ETB.', 'warning');
-      return false;
-    }
-    const isWht = isWhtRequested && grossTotal >= 20000;
-    const whtRate = 3.0;
-    const whtAmount = isWht ? Math.round((grossTotal * (whtRate / 100)) * 100) / 100 : 0;
-    const netPayable = isWht ? (grossTotal - whtAmount) : grossTotal;
+    const finalPayment = paymentType || (withholdingDetails?.paymentType) || 'Cash';
 
     const newSale = {
       id: saleId,
-      timestamp: now,
+      timestamp: now.toISOString(),
       localDate: getLocalDateString(now),
       items: cartItems,
       totalItems,
@@ -533,7 +545,7 @@ export function StockProvider({ children }) {
     };
 
     // Execute Atomic Database Transaction via Supabase RPC (S-03)
-    if (isSupabaseConfigured && currentShop?.id) {
+    if (isSupabaseConfigured && currentShop?.id && !isDemoShop(currentShop)) {
       try {
         const serverRes = await supabaseApi.recordSale({
           sale: newSale,
@@ -570,7 +582,7 @@ export function StockProvider({ children }) {
 
   // Update Withholding Voucher Number or Status
   const updateSaleWhtVoucher = async (saleId, voucherNumber, voucherStatus) => {
-    if (isSupabaseConfigured) {
+    if (isSupabaseConfigured && currentShop && !isDemoShop(currentShop)) {
       try {
         await supabaseApi.updateSaleWhtVoucher(saleId, {
           voucherNumber,
@@ -615,7 +627,7 @@ export function StockProvider({ children }) {
     const refText = reference.trim() || "Supplier Stock Receipt";
 
     // Execute atomic server update
-    if (isSupabaseConfigured && currentShop?.id) {
+    if (isSupabaseConfigured && currentShop?.id && !isDemoShop(currentShop)) {
       try {
         await supabaseApi.recordStockIn(productId, qty, refText);
       } catch (err) {
@@ -666,7 +678,7 @@ export function StockProvider({ children }) {
     const reasonText = reason.trim() || "Physical Stock Count";
 
     // Execute atomic server adjustment
-    if (isSupabaseConfigured && currentShop?.id) {
+    if (isSupabaseConfigured && currentShop?.id && !isDemoShop(currentShop)) {
       try {
         await supabaseApi.adjustStock(productId, next, reasonText);
       } catch (err) {
@@ -704,7 +716,7 @@ export function StockProvider({ children }) {
   };
 
   const refreshData = async () => {
-    if (isSupabaseConfigured && currentShop?.status === 'active') {
+    if (isSupabaseConfigured && currentShop?.status === 'active' && !isDemoShop(currentShop)) {
       await hydrateCloudData(currentShop);
       showToast("Cloud catalog and sales synchronized!", "success");
     } else {

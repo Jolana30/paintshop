@@ -5,6 +5,8 @@
  * strict server-side transactional integrity, and seamless offline/demo mode.
  */
 
+import { isValidUUID } from '../utils/formatters';
+
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const SUPABASE_ANON_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
 
@@ -156,7 +158,7 @@ export const supabaseAuth = {
    * Fetch shop profile for the authenticated user from public.shops
    */
   async getShopProfile(shopId) {
-    if (!isSupabaseConfigured || !shopId) return null;
+    if (!isSupabaseConfigured || !shopId || !isValidUUID(shopId)) return null;
     const res = await fetchFromSupabase(`shops?id=eq.${encodeURIComponent(shopId)}&select=*`);
     if (Array.isArray(res) && res.length > 0) return res[0];
     return null;
@@ -190,7 +192,7 @@ export const supabaseApi = {
    * Fetch shop inventory for a specific shop
    */
   async getShopInventory(shopId) {
-    if (!shopId) return null;
+    if (!shopId || !isValidUUID(shopId)) return [];
     return fetchFromSupabase(`shop_inventory?shop_id=eq.${encodeURIComponent(shopId)}&select=*`);
   },
 
@@ -198,7 +200,7 @@ export const supabaseApi = {
    * Fetch sales history for this specific shop
    */
   async getSales(shopId) {
-    if (!shopId) return null;
+    if (!shopId || !isValidUUID(shopId)) return [];
     return fetchFromSupabase(`sales?shop_id=eq.${encodeURIComponent(shopId)}&select=*,sale_items(*)&order=created_at.desc`);
   },
 
@@ -206,7 +208,7 @@ export const supabaseApi = {
    * Fetch stock movements audit trail for this specific shop
    */
   async getMovements(shopId) {
-    if (!shopId) return null;
+    if (!shopId || !isValidUUID(shopId)) return [];
     return fetchFromSupabase(`stock_movements?shop_id=eq.${encodeURIComponent(shopId)}&select=*&order=created_at.desc`);
   },
 
@@ -214,7 +216,7 @@ export const supabaseApi = {
    * Add a custom local product via transactional RPC (S-02)
    */
   async addCustomProduct(_shopId, product) {
-    if (!isSupabaseConfigured) return null;
+    if (!isSupabaseConfigured || (_shopId && !isValidUUID(_shopId))) return null;
     return callRpc('add_custom_product_transaction', {
       p_name: product.name,
       p_category: product.category || 'Accessories',
@@ -234,6 +236,7 @@ export const supabaseApi = {
    */
   async recordSale({ sale, items }) {
     if (!isSupabaseConfigured) return true;
+    if (sale?.shopId && !isValidUUID(sale.shopId)) return true;
 
     const saleRow = {
       id: sale.id,
@@ -312,6 +315,7 @@ export const supabaseApi = {
    */
   async updateShopStatus(shopId, status) {
     if (!isSupabaseConfigured) return true;
+    if (!shopId || !isValidUUID(shopId)) return true;
     if (status === 'active') {
       return callRpc('admin_approve_shop', { target_shop_id: shopId });
     }

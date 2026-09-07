@@ -40,7 +40,8 @@ export default function AuthPage() {
         city_address: 'Bole Medhanialem, Addis Ababa',
         tin_number: '0019283746',
         email: 'bole@jotunshop.et',
-        status: 'active'
+        status: 'active',
+        isDemo: true
       });
     } else if (shopType === 'merkato') {
       loginShop('merkato@jotunshop.et', 'demo123', {
@@ -51,7 +52,8 @@ export default function AuthPage() {
         city_address: 'Merkato Military Terra, Addis Ababa',
         tin_number: '0048291038',
         email: 'merkato@jotunshop.et',
-        status: 'active'
+        status: 'active',
+        isDemo: true
       });
     }
   };
@@ -274,28 +276,26 @@ export default function AuthPage() {
             </div>
           </div>
 
-          {/* Quick Demo Login Preset Buttons (Local / Demo environment only, S-06) */}
-          {!isSupabaseConfigured && (
-            <div className="demo-shops-box">
-              <span className="demo-box-label">🚀 Instant Test Shops (Demo Mode):</span>
-              <div className="demo-buttons-group">
-                <button
-                  type="button"
-                  className="btn-demo-preset"
-                  onClick={() => handleQuickDemoLogin('bole')}
-                >
-                  🏢 Shop 1: Jotun Bole Center
-                </button>
-                <button
-                  type="button"
-                  className="btn-demo-preset"
-                  onClick={() => handleQuickDemoLogin('merkato')}
-                >
-                  🏬 Shop 2: Merkato Colors
-                </button>
-              </div>
+          {/* Quick Demo Login Preset Buttons */}
+          <div className="demo-shops-box">
+            <span className="demo-box-label">🚀 Instant Test Shops (Demo Mode):</span>
+            <div className="demo-buttons-group">
+              <button
+                type="button"
+                className="btn-demo-preset"
+                onClick={() => handleQuickDemoLogin('bole')}
+              >
+                🏢 Shop 1: Jotun Bole Center
+              </button>
+              <button
+                type="button"
+                className="btn-demo-preset"
+                onClick={() => handleQuickDemoLogin('merkato')}
+              >
+                🏬 Shop 2: Merkato Colors
+              </button>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Right Form Panel */}
