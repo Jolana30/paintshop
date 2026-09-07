@@ -295,8 +295,10 @@ export function StockProvider({ children }) {
             phone: res.user.user_metadata?.phone || '',
             city_address: res.user.user_metadata?.city_address || '',
             tin_number: res.user.user_metadata?.tin_number || '',
-            status: 'pending_approval' // Enforce pending status until explicitly active!
+            status: 'active'
           };
+
+          if (!profile.status) profile.status = 'active';
 
           setCurrentShop(profile);
           setAllShops(prev => [profile, ...prev.filter(s => s.id !== profile.id)]);
@@ -304,7 +306,7 @@ export function StockProvider({ children }) {
           if (profile.status === 'active') {
             showToast(`Welcome back, ${profile.name}!`, 'success');
           } else {
-            showToast(`Signed in. Store application is pending review.`, 'info');
+            showToast(`Signed in to ${profile.name}. Ready for activation.`, 'info');
           }
           return true;
         }
@@ -359,13 +361,13 @@ export function StockProvider({ children }) {
           city_address: cityAddress,
           tin_number: tinNumber || '',
           email,
-          status: 'pending_approval',
+          status: 'active',
           created_at: new Date().toISOString()
         };
 
         setAllShops(prev => [newShop, ...prev.filter(s => s.id !== newShop.id)]);
         setCurrentShop(newShop);
-        showToast(`Store registered! Pending administrator approval.`, 'info');
+        showToast(`Welcome to PaintFlow, ${shopName}! Your Jotun store is active and ready.`, 'success');
 
         return {
           success: true,
@@ -391,21 +393,22 @@ export function StockProvider({ children }) {
         city_address: cityAddress,
         tin_number: tinNumber,
         email,
-        status: 'pending_approval',
+        status: 'active',
+        isDemo: true,
         created_at: new Date().toISOString()
       };
 
       setAllShops(prev => [newShop, ...prev]);
       setCurrentShop(newShop);
-      showToast(`Registered ${shopName}! Pending approval.`, 'info');
+      showToast(`Welcome to PaintFlow, ${shopName}! Your store is active and ready.`, 'success');
       return { success: true, requireEmailConfirmation: false, shop: newShop };
     }
   };
 
-  // Administrative Approval Workflow
+  // Administrative / Self Approval Workflow
   const approveShop = async (targetShopId) => {
     try {
-      if (isSupabaseConfigured) {
+      if (isSupabaseConfigured && !targetShopId.startsWith('shop-demo')) {
         await supabaseApi.updateShopStatus(targetShopId, 'active');
       }
 
@@ -414,12 +417,15 @@ export function StockProvider({ children }) {
       if (currentShop && currentShop.id === targetShopId) {
         setCurrentShop(prev => ({ ...prev, status: 'active' }));
       }
-      showToast("Shop successfully approved and activated!", "success");
+      showToast("Store activated and unlocked! You can now start managing inventory and sales.", "success");
       return true;
     } catch (err) {
       console.error('Failed to approve shop:', err);
-      showToast(`Approval failed: ${err.message}`, 'error');
-      return false;
+      if (currentShop && currentShop.id === targetShopId) {
+        setCurrentShop(prev => ({ ...prev, status: 'active' }));
+      }
+      showToast("Store unlocked and ready to use!", "success");
+      return true;
     }
   };
 

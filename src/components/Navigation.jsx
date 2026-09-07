@@ -97,14 +97,14 @@ export default function Navigation({ activeTab, setActiveTab }) {
             <span>Sync Catalog</span>
           </button>
 
-          {/* Sign Out / Switch Branch Button */}
+          {/* Sign Out Button */}
           <button
             type="button"
             className="btn-sidebar-signout"
             onClick={logoutShop}
             title="Sign out of current store"
           >
-            <span>⎋ Sign Out / Switch Store</span>
+            <span>⎋ Sign Out</span>
           </button>
 
           {/* Legal Nominative Fair Use Disclaimer */}
@@ -129,7 +129,7 @@ export default function Navigation({ activeTab, setActiveTab }) {
             type="button"
             className="mobile-refresh-btn"
             onClick={logoutShop}
-            title="Sign Out / Switch Store"
+            title="Sign Out"
             style={{ fontSize: '13px', fontWeight: 'bold' }}
           >
             ⎋

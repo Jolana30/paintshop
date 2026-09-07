@@ -224,14 +224,36 @@ BEGIN
         COALESCE(NEW.raw_user_meta_data->>'city_address', ''),
         NULLIF(NEW.raw_user_meta_data->>'tin_number', ''),
         NEW.email,
-        'pending_approval'
+        'active'
     )
-    ON CONFLICT (id) DO NOTHING;
+    ON CONFLICT (id) DO UPDATE
+    SET status = 'active';
 
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp;
+
+-- Allow authenticated shop owner to self-activate immediately
+CREATE OR REPLACE FUNCTION public.activate_my_shop()
+RETURNS JSONB AS $$
+DECLARE
+    v_shop_id UUID := auth.uid();
+BEGIN
+    IF v_shop_id IS NULL THEN
+        RAISE EXCEPTION 'Unauthorized: User is not authenticated';
+    END IF;
+
+    UPDATE public.shops
+    SET status = 'active', updated_at = NOW()
+    WHERE id = v_shop_id;
+
+    RETURN jsonb_build_object('success', true, 'shop_id', v_shop_id, 'status', 'active');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp;
+
+GRANT EXECUTE ON FUNCTION public.activate_my_shop() TO authenticated;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created

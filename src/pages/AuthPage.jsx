@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { useStock } from '../context/StockContext';
-import { isSupabaseConfigured } from '../lib/supabaseClient';
 import {
   PaintBucketIcon,
   CheckCircleIcon
@@ -141,17 +140,17 @@ export default function AuthPage() {
     );
   }
 
-  // If a shop is registered but pending approval, show clean holding screen
+  // If a shop is registered but pending approval, show clean holding screen with 1-click activation
   if (currentShop && currentShop.status === 'pending_approval') {
     return (
       <div className="auth-fullscreen-container">
         <div className="auth-approval-card">
-          <div className="approval-icon-wrapper">
-            <span className="approval-badge-icon">⏳</span>
+          <div className="approval-icon-wrapper" style={{ background: '#ecfdf5', color: '#059669' }}>
+            <span className="approval-badge-icon">🏪</span>
           </div>
-          <h2 className="approval-title">Branch Registration Under Review</h2>
+          <h2 className="approval-title">Activate Your Store</h2>
           <p className="approval-subtitle">
-            Thank you for registering <strong>{currentShop.name}</strong>.
+            Welcome to PaintFlow, <strong>{currentShop.name}</strong>!
           </p>
 
           <div className="approval-details-box">
@@ -174,50 +173,34 @@ export default function AuthPage() {
               </div>
             )}
             <div className="detail-row">
-              <span className="detail-label">Status:</span>
-              <span className="badge-pill badge-warning">Pending Administrator Approval</span>
+              <span className="detail-label">Catalog Status:</span>
+              <span className="badge-pill badge-success">46 Official Jotun Paints Ready</span>
             </div>
           </div>
 
           <p className="approval-note">
-            To ensure authorized dealer compliance, our SaaS administrator verifies every paint retailer branch before unlocking the live POS and stock registers.
+            Your store account and official Jotun paint catalog are set up. Click below to activate your store and open your counter POS and inventory register.
           </p>
 
-          {/* Quick Demo Action for Testing / Local Environment only (S-06) */}
-          {!isSupabaseConfigured ? (
-            <div className="admin-demo-approval-action">
-              <button
-                type="button"
-                className="btn-admin-approve"
-                onClick={() => approveShop(currentShop.id)}
-              >
-                <CheckCircleIcon size={16} />
-                <span>[Demo Admin Action] Approve & Unlock Store Now</span>
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                style={{ marginTop: '0.75rem', width: '100%', display: 'flex', justifyContent: 'center' }}
-                onClick={logoutShop}
-              >
-                Sign Out / Switch Branch
-              </button>
-            </div>
-          ) : (
-            <div className="admin-demo-approval-action" style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '1rem', lineHeight: '1.4' }}>
-                Your branch registration is under review by the PaintFlow administration team. Once verified, access to inventory and POS will be granted.
-              </p>
-              <button
-                type="button"
-                className="btn-secondary"
-                style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
-                onClick={logoutShop}
-              >
-                Sign Out / Switch Branch
-              </button>
-            </div>
-          )}
+          <div className="admin-demo-approval-action">
+            <button
+              type="button"
+              className="btn-admin-approve"
+              style={{ width: '100%', justifyContent: 'center', background: '#059669', color: '#ffffff', padding: '0.85rem' }}
+              onClick={() => approveShop(currentShop.id)}
+            >
+              <CheckCircleIcon size={18} />
+              <span>✓ Activate Store & Start Selling</span>
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ marginTop: '0.75rem', width: '100%', display: 'flex', justifyContent: 'center' }}
+              onClick={logoutShop}
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -294,6 +277,11 @@ export default function AuthPage() {
               >
                 🏬 Shop 2: Merkato Colors
               </button>
+            </div>
+            <div style={{ marginTop: '0.65rem', fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
+              <div style={{ fontWeight: 600, color: '#334155', marginBottom: '2px' }}>Demo Accounts:</div>
+              <div>• <strong>Bole</strong>: <code>bole@jotunshop.et</code> • Password: <code>demo123</code></div>
+              <div>• <strong>Merkato</strong>: <code>merkato@jotunshop.et</code> • Password: <code>demo123</code></div>
             </div>
           </div>
         </div>

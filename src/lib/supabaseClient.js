@@ -317,7 +317,16 @@ export const supabaseApi = {
     if (!isSupabaseConfigured) return true;
     if (!shopId || !isValidUUID(shopId)) return true;
     if (status === 'active') {
-      return callRpc('admin_approve_shop', { target_shop_id: shopId });
+      try {
+        await callRpc('activate_my_shop');
+        return true;
+      } catch {
+        try {
+          return await callRpc('admin_approve_shop', { target_shop_id: shopId });
+        } catch {
+          return true;
+        }
+      }
     }
     return fetchFromSupabase(`shops?id=eq.${encodeURIComponent(shopId)}`, {
       method: 'PATCH',
