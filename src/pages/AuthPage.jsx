@@ -41,6 +41,7 @@ export default function AuthPage({ onOpenAdmin }) {
   const [isLoading, setIsLoading] = useState(false);
   const [formMessage, setFormMessage] = useState(null);
   const [emailConfirmationNotice, setEmailConfirmationNotice] = useState(null);
+  const [registeredPendingShop, setRegisteredPendingShop] = useState(null);
 
   // Platform Admin Console State
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
@@ -136,11 +137,9 @@ export default function AuthPage({ onOpenAdmin }) {
 
     setIsLoading(false);
     if (res?.success) {
-      if (res.requireEmailConfirmation) {
-        setEmailConfirmationNotice(res.email);
+      if (res.shop) {
+        setRegisteredPendingShop(res.shop);
       }
-      // Note: If success, StockContext immediately sets currentShop with status 'pending_approval'
-      // which immediately triggers rendering of the Pending Approval Holding Screen!
     } else {
       setFormMessage({
         type: 'error',
@@ -414,8 +413,10 @@ export default function AuthPage({ onOpenAdmin }) {
     );
   }
 
+  const pendingShop = (currentShop && currentShop.status === 'pending_approval') ? currentShop : registeredPendingShop;
+
   // 1-Click Paid SaaS Activation Gate: If a shop is registered but pending approval
-  if (currentShop && currentShop.status === 'pending_approval') {
+  if (pendingShop) {
     return (
       <div className="auth-fullscreen-container">
         {renderAdminModal()}
@@ -425,7 +426,7 @@ export default function AuthPage({ onOpenAdmin }) {
           </div>
           <h2 className="approval-title">Store Account Pending Activation</h2>
           <p className="approval-subtitle">
-            Welcome to PaintFlow, <strong>{currentShop.name}</strong>!
+            Welcome to PaintFlow, <strong>{pendingShop.name}</strong>!
           </p>
 
           <div className="holding-commercial-box">
@@ -438,28 +439,28 @@ export default function AuthPage({ onOpenAdmin }) {
           <div className="approval-details-box">
             <div className="detail-row">
               <span className="detail-label">Store / Branch:</span>
-              <span className="detail-val">{currentShop.name}</span>
+              <span className="detail-val">{pendingShop.name}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Location / City:</span>
-              <span className="detail-val">{currentShop.city_address}</span>
+              <span className="detail-val">{pendingShop.city_address}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Contact Phone:</span>
-              <span className="detail-val">{currentShop.phone}</span>
+              <span className="detail-val">{pendingShop.phone}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Personal / Store Email:</span>
-              <span className="detail-val">{currentShop.email}</span>
+              <span className="detail-val">{pendingShop.email}</span>
             </div>
             <div className="detail-row">
               <span className="detail-label">Owner / Contact:</span>
-              <span className="detail-val">{currentShop.owner_name || 'Store Manager'}</span>
+              <span className="detail-val">{pendingShop.owner_name || 'Store Manager'}</span>
             </div>
-            {currentShop.tin_number && (
+            {pendingShop.tin_number && (
               <div className="detail-row">
                 <span className="detail-label">TIN Number:</span>
-                <span className="detail-val">{currentShop.tin_number}</span>
+                <span className="detail-val">{pendingShop.tin_number}</span>
               </div>
             )}
             <div className="detail-row">
@@ -511,7 +512,10 @@ export default function AuthPage({ onOpenAdmin }) {
               type="button"
               className="btn-secondary"
               style={{ marginTop: '0.75rem', width: '100%', display: 'flex', justifyContent: 'center' }}
-              onClick={logoutShop}
+              onClick={() => {
+                setRegisteredPendingShop(null);
+                logoutShop();
+              }}
             >
               ⎋ Sign Out / Change Account
             </button>
