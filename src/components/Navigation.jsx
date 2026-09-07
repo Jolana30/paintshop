@@ -97,6 +97,17 @@ export default function Navigation({ activeTab, setActiveTab }) {
             <span>Sync Catalog</span>
           </button>
 
+          {/* Platform Admin Console Link */}
+          <button
+            type="button"
+            className="btn-refresh-sync mb-2"
+            style={{ background: '#0f172a', color: '#ffffff', border: '1px solid #334155' }}
+            onClick={() => setActiveTab('admin')}
+            title="Open Platform Admin Console"
+          >
+            <span>🛡️ Platform Admin</span>
+          </button>
+
           {/* Sign Out Button */}
           <button
             type="button"
@@ -125,6 +136,16 @@ export default function Navigation({ activeTab, setActiveTab }) {
         </div>
 
         <div className="mobile-header-actions">
+          <button
+            type="button"
+            className="mobile-refresh-btn"
+            onClick={() => setActiveTab('admin')}
+            title="Platform Admin Console"
+            style={{ fontSize: '13px' }}
+          >
+            🛡️
+          </button>
+
           <button
             type="button"
             className="mobile-refresh-btn"

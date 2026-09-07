@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { StockProvider, useStock } from './context/StockContext';
 import Navigation from './components/Navigation';
 import AuthPage from './pages/AuthPage';
+import AdminPage from './pages/AdminPage';
 import Dashboard from './pages/Dashboard';
 import NewSale from './pages/NewSale';
 import StockIn from './pages/StockIn';
@@ -11,11 +12,11 @@ import Reports from './pages/Reports';
 import './App.css';
 
 function MainLayout() {
-  const { currentShop, toast } = useStock();
+  const { currentShop, setCurrentShop, toast } = useStock();
 
   const [activeTab, setActiveTabState] = useState(() => {
     const hash = window.location.hash.replace('#', '');
-    const validTabs = ['dashboard', 'newsale', 'stockin', 'inventory', 'sales', 'reports'];
+    const validTabs = ['dashboard', 'newsale', 'stockin', 'inventory', 'sales', 'reports', 'admin'];
     if (validTabs.includes(hash)) return hash;
 
     const saved = sessionStorage.getItem('jotun_active_tab');
@@ -33,6 +34,19 @@ function MainLayout() {
     window.location.hash = tab;
   };
 
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      const validTabs = ['dashboard', 'newsale', 'stockin', 'inventory', 'sales', 'reports', 'admin'];
+      if (validTabs.includes(hash)) {
+        setActiveTabState(hash);
+        sessionStorage.setItem('jotun_active_tab', hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   const handleSelectStockIn = (prodId) => {
     setStockInProductId(prodId);
   };
@@ -42,11 +56,41 @@ function MainLayout() {
     setActiveTab('sales');
   };
 
+  // Dedicated Platform Admin Console View (Accessible via #admin or clicking Admin anywhere)
+  if (activeTab === 'admin') {
+    return (
+      <div className="admin-shell">
+        <AdminPage
+          onBackToApp={() => {
+            if (currentShop && currentShop.status === 'active') {
+              setActiveTab('dashboard');
+            } else {
+              setActiveTab('dashboard');
+              window.location.hash = '';
+            }
+          }}
+          onSelectShop={(shop) => {
+            setCurrentShop(shop);
+            if (shop.status === 'active') {
+              setActiveTab('dashboard');
+            }
+          }}
+        />
+        {toast && (
+          <div className={`toast-notification toast-${toast.type}`}>
+            <div className="toast-dot"></div>
+            <span>{toast.message}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // If user is not logged into any shop, or shop is pending approval, render Auth Portal
   if (!currentShop || currentShop.status === 'pending_approval') {
     return (
       <div className="auth-shell">
-        <AuthPage />
+        <AuthPage onOpenAdmin={() => setActiveTab('admin')} />
         {toast && (
           <div className={`toast-notification toast-${toast.type}`}>
             <div className="toast-dot"></div>

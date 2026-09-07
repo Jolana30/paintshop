@@ -5,7 +5,7 @@ import {
   CheckCircleIcon
 } from '../components/Icons';
 
-export default function AuthPage() {
+export default function AuthPage({ onOpenAdmin }) {
   const {
     currentShop,
     allShops,
@@ -490,7 +490,7 @@ export default function AuthPage() {
               type="button"
               className="btn-admin-approve"
               style={{ width: '100%', justifyContent: 'center', background: '#0f172a', color: '#ffffff', padding: '0.85rem' }}
-              onClick={() => setIsAdminModalOpen(true)}
+              onClick={() => onOpenAdmin ? onOpenAdmin() : setIsAdminModalOpen(true)}
             >
               <span>🛡️ Platform Admin: Review & Activate Store</span>
             </button>
@@ -604,7 +604,7 @@ export default function AuthPage() {
 
         {/* Right Form Panel */}
         <div className="auth-form-panel">
-          <div className="auth-tab-selector">
+          <div className="auth-tab-selector" style={{ display: 'flex', gap: '0.35rem' }}>
             <button
               type="button"
               className={`auth-tab-btn ${activeTab === 'login' ? 'active' : ''}`}
@@ -619,6 +619,15 @@ export default function AuthPage() {
             >
               <span className="tab-label-full">Register Paint Shop</span>
               <span className="tab-label-short">Register</span>
+            </button>
+            <button
+              type="button"
+              className="auth-tab-btn"
+              style={{ background: '#0f172a', color: '#ffffff', fontWeight: 700, flex: '0 0 auto', padding: '0.65rem 0.85rem' }}
+              onClick={() => onOpenAdmin ? onOpenAdmin() : setIsAdminModalOpen(true)}
+              title="Platform Admin Console & Store Approvals"
+            >
+              <span>🛡️ Admin</span>
             </button>
           </div>
 
@@ -849,7 +858,7 @@ export default function AuthPage() {
             <button
               type="button"
               className="btn-open-admin-link"
-              onClick={() => setIsAdminModalOpen(true)}
+              onClick={() => onOpenAdmin ? onOpenAdmin() : setIsAdminModalOpen(true)}
             >
               🛡️ Platform Admin Console (Platform Owner)
             </button>

@@ -841,6 +841,7 @@ export function StockProvider({ children }) {
     <StockContext.Provider
       value={{
         currentShop,
+        setCurrentShop,
         allShops,
         loginShop,
         registerShop,
