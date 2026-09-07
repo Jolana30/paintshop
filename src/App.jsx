@@ -12,7 +12,7 @@ import Reports from './pages/Reports';
 import './App.css';
 
 function MainLayout() {
-  const { currentShop, setCurrentShop, toast } = useStock();
+  const { currentShop, toast } = useStock();
 
   const [activeTab, setActiveTabState] = useState(() => {
     const hash = window.location.hash.replace('#', '');
@@ -67,12 +67,6 @@ function MainLayout() {
             } else {
               setActiveTab('dashboard');
               window.location.hash = '';
-            }
-          }}
-          onSelectShop={(shop) => {
-            setCurrentShop(shop);
-            if (shop.status === 'active') {
-              setActiveTab('dashboard');
             }
           }}
         />

@@ -7,7 +7,7 @@ import {
   RefreshCwIcon
 } from '../components/Icons';
 
-export default function AdminPage({ onBackToApp, onSelectShop }) {
+export default function AdminPage({ onBackToApp }) {
   const {
     allShops,
     approveShop,
@@ -423,17 +423,7 @@ export default function AdminPage({ onBackToApp, onSelectShop }) {
                       </button>
                     )}
 
-                    {onSelectShop && (
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        style={{ padding: '0.55rem 0.9rem', fontSize: '0.82rem' }}
-                        onClick={() => onSelectShop(shop)}
-                        title="Open this shop's counter POS"
-                      >
-                        <span>🏪 Open POS as this Shop</span>
-                      </button>
-                    )}
+
 
                     {!shop.isDemo && (
                       <button

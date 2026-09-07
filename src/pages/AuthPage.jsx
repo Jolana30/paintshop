@@ -61,34 +61,7 @@ export default function AuthPage() {
     setPhone(clean);
   };
 
-  // Quick Demo presets for testing
-  const handleQuickDemoLogin = (shopType) => {
-    if (shopType === 'bole') {
-      loginShop('bole@jotunshop.et', 'demo123', {
-        id: 'shop-demo-bole',
-        name: 'Jotun Bole Paint Center',
-        owner_name: 'Abebe Kebede',
-        phone: '+251 911 234 567',
-        city_address: 'Bole Medhanialem, Addis Ababa',
-        tin_number: '0019283746',
-        email: 'bole@jotunshop.et',
-        status: 'active',
-        isDemo: true
-      });
-    } else if (shopType === 'merkato') {
-      loginShop('merkato@jotunshop.et', 'demo123', {
-        id: 'shop-demo-merkato',
-        name: 'Merkato Colors (Jotun Dealer)',
-        owner_name: 'Sara Tesfaye',
-        phone: '+251 922 987 654',
-        city_address: 'Merkato Military Terra, Addis Ababa',
-        tin_number: '0048291038',
-        email: 'merkato@jotunshop.et',
-        status: 'active',
-        isDemo: true
-      });
-    }
-  };
+
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -263,7 +236,7 @@ export default function AuthPage() {
                 logoutShop();
               }}
             >
-              ⎋ Sign Out / Change Account
+              ⎋ Sign Out
             </button>
           </div>
         </div>
@@ -324,30 +297,16 @@ export default function AuthPage() {
             </div>
           </div>
 
-          {/* Quick Demo Login Preset Buttons */}
+          {/* Test Accounts Reference */}
           <div className="demo-shops-box">
-            <span className="demo-box-label">🚀 Instant Test Shops (Demo Mode):</span>
-            <div className="demo-buttons-group">
-              <button
-                type="button"
-                className="btn-demo-preset"
-                onClick={() => handleQuickDemoLogin('bole')}
-              >
-                🏢 Shop 1: Jotun Bole Center
-              </button>
-              <button
-                type="button"
-                className="btn-demo-preset"
-                onClick={() => handleQuickDemoLogin('merkato')}
-              >
-                🏬 Shop 2: Merkato Colors
-              </button>
+            <span className="demo-box-label">🔑 Pre-configured Accounts:</span>
+            <div style={{ marginTop: '0.45rem', fontSize: '0.8rem', color: '#475569', lineHeight: '1.5' }}>
+              <div>• <strong>Bole</strong>: <code>bole@jotunshop.et</code> (Password: <code>demo123</code>)</div>
+              <div>• <strong>Merkato</strong>: <code>merkato@jotunshop.et</code> (Password: <code>demo123</code>)</div>
             </div>
-            <div style={{ marginTop: '0.65rem', fontSize: '0.78rem', color: '#64748b', lineHeight: '1.4' }}>
-              <div style={{ fontWeight: 600, color: '#334155', marginBottom: '2px' }}>Demo Accounts:</div>
-              <div>• <strong>Bole</strong>: <code>bole@jotunshop.et</code> • Password: <code>demo123</code></div>
-              <div>• <strong>Merkato</strong>: <code>merkato@jotunshop.et</code> • Password: <code>demo123</code></div>
-            </div>
+            <p style={{ margin: '0.45rem 0 0', fontSize: '0.74rem', color: '#64748b' }}>
+              Sign in with your store credentials. To access another branch, sign out and log in again.
+            </p>
           </div>
         </div>
 
