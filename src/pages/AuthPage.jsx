@@ -5,15 +5,11 @@ import {
   CheckCircleIcon
 } from '../components/Icons';
 
-export default function AuthPage({ onOpenAdmin }) {
+export default function AuthPage() {
   const {
     currentShop,
-    allShops,
     loginShop,
     registerShop,
-    approveShop,
-    suspendShop,
-    deleteShop,
     logoutShop,
     authError,
     clearAuthError,
@@ -42,13 +38,6 @@ export default function AuthPage({ onOpenAdmin }) {
   const [formMessage, setFormMessage] = useState(null);
   const [emailConfirmationNotice, setEmailConfirmationNotice] = useState(null);
   const [registeredPendingShop, setRegisteredPendingShop] = useState(null);
-
-  // Platform Admin Console State
-  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
-  const [adminPin, setAdminPin] = useState('');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [adminError, setAdminError] = useState('');
-  const [adminFilter, setAdminFilter] = useState('all'); // 'all' | 'pending' | 'active'
 
   // Strict Phone Validation: Only allow digits 0-9, leading +, spaces, hyphens
   const handlePhoneKeyDown = (e) => {
@@ -148,239 +137,7 @@ export default function AuthPage({ onOpenAdmin }) {
     }
   };
 
-  const handleAdminUnlock = (e) => {
-    e.preventDefault();
-    if (adminPin.trim() === 'admin2026') {
-      setIsAdminAuthenticated(true);
-      setAdminError('');
-    } else {
-      setAdminError('Incorrect Master PIN. (Default: admin2026)');
-    }
-  };
 
-  // Filtered shops list for Platform Admin Console
-  const filteredShops = (allShops || []).filter(s => {
-    if (adminFilter === 'pending') return s.status !== 'active';
-    if (adminFilter === 'active') return s.status === 'active';
-    return true;
-  });
-
-  const pendingCount = (allShops || []).filter(s => s.status !== 'active').length;
-  const activeCount = (allShops || []).filter(s => s.status === 'active').length;
-
-  // Render Platform Admin Console Modal
-  const renderAdminModal = () => {
-    if (!isAdminModalOpen) return null;
-
-    return (
-      <div className="admin-modal-overlay" onClick={() => setIsAdminModalOpen(false)}>
-        <div className="admin-modal-container" onClick={(e) => e.stopPropagation()}>
-          <div className="admin-modal-header">
-            <div>
-              <h3>🛡️ PaintFlow Platform Admin Console</h3>
-              <p>Store Approvals, Activation Gate & Commercial SaaS Manager</p>
-            </div>
-            <button
-              type="button"
-              className="admin-modal-close"
-              onClick={() => setIsAdminModalOpen(false)}
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="admin-modal-body">
-            {!isAdminAuthenticated ? (
-              <form onSubmit={handleAdminUnlock} className="admin-auth-box">
-                <div className="admin-auth-icon">🔐</div>
-                <h4 className="admin-auth-title">Platform Administrator Access</h4>
-                <p className="admin-auth-desc">
-                  Enter the platform master PIN to manage paid subscriptions, approve newly registered shops, or suspend accounts.
-                </p>
-
-                {adminError && (
-                  <div className="auth-banner banner-error mb-3" style={{ padding: '0.6rem', fontSize: '0.8rem' }}>
-                    {adminError}
-                  </div>
-                )}
-
-                <input
-                  type="password"
-                  required
-                  autoFocus
-                  placeholder="Master PIN (admin2026)"
-                  value={adminPin}
-                  onChange={(e) => { setAdminPin(e.target.value); setAdminError(''); }}
-                  className="admin-pin-input"
-                />
-
-                <button
-                  type="submit"
-                  className="btn-auth-submit"
-                  style={{ marginTop: '0.25rem' }}
-                >
-                  Unlock Admin Console
-                </button>
-              </form>
-            ) : (
-              <div>
-                {/* Stats Bar */}
-                <div className="admin-stats-bar">
-                  <div className="admin-stat-card">
-                    <span className="admin-stat-val">{(allShops || []).length}</span>
-                    <span className="admin-stat-label">Total Stores</span>
-                  </div>
-                  <div className="admin-stat-card" style={{ borderColor: '#fde68a', background: '#fffdf5' }}>
-                    <span className="admin-stat-val" style={{ color: '#d97706' }}>{pendingCount}</span>
-                    <span className="admin-stat-label">Pending Approval</span>
-                  </div>
-                  <div className="admin-stat-card" style={{ borderColor: '#d1fae5', background: '#fcfdfd' }}>
-                    <span className="admin-stat-val" style={{ color: '#059669' }}>{activeCount}</span>
-                    <span className="admin-stat-label">Active Paid Licenses</span>
-                  </div>
-                </div>
-
-                {/* Filter Tabs */}
-                <div className="admin-tabs-row">
-                  <button
-                    type="button"
-                    className={`admin-tab-btn ${adminFilter === 'all' ? 'active' : ''}`}
-                    onClick={() => setAdminFilter('all')}
-                  >
-                    All Stores ({(allShops || []).length})
-                  </button>
-                  <button
-                    type="button"
-                    className={`admin-tab-btn ${adminFilter === 'pending' ? 'active' : ''}`}
-                    onClick={() => setAdminFilter('pending')}
-                  >
-                    Pending Activation ({pendingCount})
-                  </button>
-                  <button
-                    type="button"
-                    className={`admin-tab-btn ${adminFilter === 'active' ? 'active' : ''}`}
-                    onClick={() => setAdminFilter('active')}
-                  >
-                    Active Stores ({activeCount})
-                  </button>
-                </div>
-
-                {/* Shops List */}
-                <div className="admin-shops-list">
-                  {filteredShops.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b', fontSize: '0.9rem' }}>
-                      No stores found matching this filter.
-                    </div>
-                  ) : (
-                    filteredShops.map(shop => {
-                      const isPending = shop.status !== 'active';
-                      return (
-                        <div
-                          key={shop.id}
-                          className={`admin-shop-card ${isPending ? 'is-pending' : 'is-active'}`}
-                        >
-                          <div className="admin-shop-card-top">
-                            <div>
-                              <h4 className="admin-shop-name">{shop.name}</h4>
-                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                                ID: <code>{shop.id}</code>
-                              </span>
-                            </div>
-                            <span className={`badge-pill ${isPending ? 'badge-warning' : 'badge-success'}`}>
-                              {isPending ? '⏳ Pending Approval' : '✓ Active & Paid'}
-                            </span>
-                          </div>
-
-                          <div className="admin-shop-meta-grid">
-                            <div className="admin-shop-meta-item">
-                              <strong>Owner / Contact:</strong> {shop.owner_name || 'N/A'}
-                            </div>
-                            <div className="admin-shop-meta-item">
-                              <strong>Phone:</strong> {shop.phone || 'N/A'}
-                            </div>
-                            <div className="admin-shop-meta-item">
-                              <strong>Email:</strong> {shop.email}
-                            </div>
-                            <div className="admin-shop-meta-item">
-                              <strong>Location:</strong> {shop.city_address || 'Addis Ababa'}
-                            </div>
-                            {shop.tin_number && (
-                              <div className="admin-shop-meta-item">
-                                <strong>TIN:</strong> {shop.tin_number}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="admin-shop-actions">
-                            {isPending ? (
-                              <button
-                                type="button"
-                                className="btn-admin-act-approve"
-                                onClick={() => approveShop(shop.id)}
-                              >
-                                ✓ Approve & Activate Store
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="btn-admin-act-suspend"
-                                onClick={() => suspendShop(shop.id)}
-                              >
-                                ⏸️ Suspend Access
-                              </button>
-                            )}
-
-                            {!shop.isDemo && (
-                              <button
-                                type="button"
-                                className="btn-admin-act-delete"
-                                onClick={() => {
-                                  if (window.confirm(`Are you sure you want to remove "${shop.name}"?`)) {
-                                    deleteShop(shop.id);
-                                  }
-                                }}
-                              >
-                                ✕ Remove
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="admin-modal-footer">
-            {isAdminAuthenticated && (
-              <button
-                type="button"
-                className="btn-secondary"
-                style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem' }}
-                onClick={() => {
-                  setIsAdminAuthenticated(false);
-                  setAdminPin('');
-                }}
-              >
-                🔒 Lock Console
-              </button>
-            )}
-            <button
-              type="button"
-              className="btn-primary"
-              style={{ padding: '0.45rem 1rem', fontSize: '0.8rem' }}
-              onClick={() => setIsAdminModalOpen(false)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   // Show email confirmation holding view if user must verify inbox first
   if (emailConfirmationNotice) {
@@ -419,7 +176,6 @@ export default function AuthPage({ onOpenAdmin }) {
   if (pendingShop) {
     return (
       <div className="auth-fullscreen-container">
-        {renderAdminModal()}
         <div className="auth-approval-card">
           <div className="approval-icon-wrapper" style={{ background: '#fef3c7', color: '#d97706' }}>
             <span className="approval-badge-icon">⏳</span>
@@ -486,20 +242,10 @@ export default function AuthPage({ onOpenAdmin }) {
           </div>
 
           <div className="admin-demo-approval-action">
-            {/* Direct Admin Review Button */}
             <button
               type="button"
-              className="btn-admin-approve"
-              style={{ width: '100%', justifyContent: 'center', background: '#0f172a', color: '#ffffff', padding: '0.85rem' }}
-              onClick={() => onOpenAdmin ? onOpenAdmin() : setIsAdminModalOpen(true)}
-            >
-              <span>🛡️ Platform Admin: Review & Activate Store</span>
-            </button>
-
-            <button
-              type="button"
-              className="btn-secondary"
-              style={{ marginTop: '0.75rem', width: '100%', display: 'flex', justifyContent: 'center', gap: '0.4rem', alignItems: 'center' }}
+              className="btn-primary"
+              style={{ width: '100%', justifyContent: 'center', padding: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
               onClick={async () => {
                 await refreshData();
                 showToast("Checking store activation status...", "info");
@@ -527,7 +273,6 @@ export default function AuthPage({ onOpenAdmin }) {
 
   return (
     <div className="auth-fullscreen-container">
-      {renderAdminModal()}
       <div className="auth-card-wrapper">
         {/* Left Presentation Hero */}
         <div className="auth-hero-panel">
@@ -608,7 +353,7 @@ export default function AuthPage({ onOpenAdmin }) {
 
         {/* Right Form Panel */}
         <div className="auth-form-panel">
-          <div className="auth-tab-selector" style={{ display: 'flex', gap: '0.35rem' }}>
+          <div className="auth-tab-selector">
             <button
               type="button"
               className={`auth-tab-btn ${activeTab === 'login' ? 'active' : ''}`}
@@ -623,15 +368,6 @@ export default function AuthPage({ onOpenAdmin }) {
             >
               <span className="tab-label-full">Register Paint Shop</span>
               <span className="tab-label-short">Register</span>
-            </button>
-            <button
-              type="button"
-              className="auth-tab-btn"
-              style={{ background: '#0f172a', color: '#ffffff', fontWeight: 700, flex: '0 0 auto', padding: '0.65rem 0.85rem' }}
-              onClick={() => onOpenAdmin ? onOpenAdmin() : setIsAdminModalOpen(true)}
-              title="Platform Admin Console & Store Approvals"
-            >
-              <span>🛡️ Admin</span>
             </button>
           </div>
 
@@ -857,16 +593,6 @@ export default function AuthPage({ onOpenAdmin }) {
             </form>
           )}
 
-          {/* Admin Console Access Link */}
-          <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-            <button
-              type="button"
-              className="btn-open-admin-link"
-              onClick={() => onOpenAdmin ? onOpenAdmin() : setIsAdminModalOpen(true)}
-            >
-              🛡️ Platform Admin Console (Platform Owner)
-            </button>
-          </div>
 
           {/* Legal Nominative Fair Use Disclaimer */}
           <div className="legal-disclaimer-box">
