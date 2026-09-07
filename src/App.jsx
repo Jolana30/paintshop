@@ -11,19 +11,25 @@ import Sales from './pages/Sales';
 import Reports from './pages/Reports';
 import './App.css';
 
+function getActiveTabFromLocation() {
+  const path = window.location.pathname.replace(/^\/+|\/+$/g, '').toLowerCase();
+  const hash = window.location.hash.replace('#', '').toLowerCase();
+  const validTabs = ['dashboard', 'newsale', 'stockin', 'inventory', 'sales', 'reports', 'admin'];
+
+  if (path === 'admin' || hash === 'admin') return 'admin';
+  if (validTabs.includes(hash)) return hash;
+  if (validTabs.includes(path)) return path;
+
+  const saved = sessionStorage.getItem('jotun_active_tab');
+  if (validTabs.includes(saved)) return saved;
+
+  return 'dashboard';
+}
+
 function MainLayout() {
   const { currentShop, toast } = useStock();
 
-  const [activeTab, setActiveTabState] = useState(() => {
-    const hash = window.location.hash.replace('#', '');
-    const validTabs = ['dashboard', 'newsale', 'stockin', 'inventory', 'sales', 'reports', 'admin'];
-    if (validTabs.includes(hash)) return hash;
-
-    const saved = sessionStorage.getItem('jotun_active_tab');
-    if (validTabs.includes(saved)) return saved;
-
-    return 'dashboard';
-  });
+  const [activeTab, setActiveTabState] = useState(getActiveTabFromLocation);
 
   const [stockInProductId, setStockInProductId] = useState(null);
   const [salesFilterDate, setSalesFilterDate] = useState('');
@@ -35,16 +41,17 @@ function MainLayout() {
   };
 
   useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '');
-      const validTabs = ['dashboard', 'newsale', 'stockin', 'inventory', 'sales', 'reports', 'admin'];
-      if (validTabs.includes(hash)) {
-        setActiveTabState(hash);
-        sessionStorage.setItem('jotun_active_tab', hash);
-      }
+    const handleLocationChange = () => {
+      const tab = getActiveTabFromLocation();
+      setActiveTabState(tab);
+      sessionStorage.setItem('jotun_active_tab', tab);
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('hashchange', handleLocationChange);
+    window.addEventListener('popstate', handleLocationChange);
+    return () => {
+      window.removeEventListener('hashchange', handleLocationChange);
+      window.removeEventListener('popstate', handleLocationChange);
+    };
   }, []);
 
   const handleSelectStockIn = (prodId) => {
@@ -56,7 +63,7 @@ function MainLayout() {
     setActiveTab('sales');
   };
 
-  // Dedicated Platform Admin Console View (Accessible via #admin or clicking Admin anywhere)
+  // Dedicated Platform Admin Console View (Accessible via /admin, #admin, or Platform link)
   if (activeTab === 'admin') {
     return (
       <div className="admin-shell">
@@ -65,8 +72,12 @@ function MainLayout() {
             if (currentShop && currentShop.status === 'active') {
               setActiveTab('dashboard');
             } else {
-              setActiveTab('dashboard');
+              setActiveTabState('dashboard');
+              sessionStorage.setItem('jotun_active_tab', 'dashboard');
               window.location.hash = '';
+              if (window.location.pathname.toLowerCase().startsWith('/admin')) {
+                window.history.pushState(null, '', '/');
+              }
             }
           }}
         />
@@ -84,7 +95,7 @@ function MainLayout() {
   if (!currentShop || currentShop.status === 'pending_approval') {
     return (
       <div className="auth-shell">
-        <AuthPage />
+        <AuthPage onOpenAdmin={() => setActiveTab('admin')} />
         {toast && (
           <div className={`toast-notification toast-${toast.type}`}>
             <div className="toast-dot"></div>
