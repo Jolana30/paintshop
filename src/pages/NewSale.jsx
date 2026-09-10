@@ -21,7 +21,7 @@ export default function NewSale({ setActiveTab }) {
   const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
 
   // Customer & Ethiopian 3% Withholding Tax (WHT) State
-  const [customerName, setCustomerName] = useState('');
+  const [customerName, setCustomerName] = useState('Walk-in Customer');
   const [customerTin, setCustomerTin] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [isWithholding, setIsWithholding] = useState(false);
@@ -252,6 +252,18 @@ export default function NewSale({ setActiveTab }) {
       showToast("Customer Name is required for every receipt. Enter a name or tap '+ Walk-in'.", 'warning');
       return;
     }
+
+    // Safeguard: Check if any tintable base paint has no colorant cost entered from the tinting machine
+    const uncoloredBase = cart.find(item => item.isTintable && (!item.colorantCost || item.colorantCost <= 0));
+    if (uncoloredBase) {
+      const proceedWithoutColorant = window.confirm(
+        `⚠️ Tinting Base Notice:\n\n"${uncoloredBase.productName}" (${uncoloredBase.size}) is a tinting base paint with 0.00 ETB colorant cost entered.\n\nDid you forget to enter the machine colorant cost from Jotun Colour Manager?\n\n• Click "Cancel" to go back and enter the colorant cost.\n• Click "OK" to proceed anyway with 0.00 colorant.`
+      );
+      if (!proceedWithoutColorant) {
+        return;
+      }
+    }
+
     if (isWithholding && isWhtEligible && !customerPhone.trim()) {
       showToast("Contact phone number is required for withholding voucher follow-up.", 'warning');
       return;
@@ -281,7 +293,7 @@ export default function NewSale({ setActiveTab }) {
         setCart([]);
         setPaymentType('Cash');
         setIsWithholding(false);
-        setCustomerName('');
+        setCustomerName('Walk-in Customer');
         setCustomerTin('');
         setCustomerPhone('');
         setWhtVoucherNumber('');
@@ -674,7 +686,7 @@ export default function NewSale({ setActiveTab }) {
                       <div className="wht-fields-container">
                         <div className="form-group mb-2">
                           <label className="text-xs font-bold text-warning-dark" style={{ display: 'block', marginBottom: '3px' }}>
-                            📞 Contact Phone for Voucher Follow-up <span className="text-danger">*</span>
+                            Phone Number <span className="text-danger">*</span>
                           </label>
                           <input
                             type="tel"
@@ -989,7 +1001,7 @@ export default function NewSale({ setActiveTab }) {
                     <div className="wht-fields-container">
                       <div className="form-group mb-2">
                         <label className="text-xs font-bold text-warning-dark" style={{ display: 'block', marginBottom: '3px' }}>
-                          📞 Contact Phone for Voucher Follow-up <span className="text-danger">*</span>
+                          Phone Number <span className="text-danger">*</span>
                         </label>
                         <input
                           type="tel"

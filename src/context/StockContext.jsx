@@ -141,7 +141,29 @@ export function StockProvider({ children }) {
   // 2. Per-Shop Products (Official 46 Jotun Paints + Shop Custom Accessories)
   const [products, setProducts] = useState(() => {
     const saved = localStorage.getItem(`paintflow_products_${shopId}`);
-    return saved ? JSON.parse(saved) : initialProducts;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.map(p => {
+            const master = initialProducts.find(ip => ip.id === p.id);
+            if (master) {
+              return {
+                ...p,
+                category: master.category,
+                priceBeforeVat: master.priceBeforeVat,
+                priceWithVat: master.priceWithVat,
+                size: master.size,
+                code: master.code,
+                name: master.name
+              };
+            }
+            return p;
+          });
+        }
+      } catch { /* ignore */ }
+    }
+    return initialProducts;
   });
 
   // 3. Per-Shop Sales History (with 3% Withholding Tax details)
@@ -771,6 +793,8 @@ export function StockProvider({ children }) {
       id: 'MOV-' + generateUUID(),
       productId: targetProduct.id,
       productName: targetProduct.name,
+      productSize: targetProduct.size,
+      productCode: targetProduct.code,
       type: 'STOCK_IN',
       quantity: qty,
       previousStock: prev,
@@ -782,7 +806,7 @@ export function StockProvider({ children }) {
     setProducts(updatedProducts);
     setMovements(prev => [newMovement, ...prev]);
 
-    showToast(`Stock received: ${targetProduct.name} (+${qty} units)`, 'success');
+    showToast(`Stock received: ${targetProduct.name} (${targetProduct.size}) (+${qty} units)`, 'success');
     return true;
   };
 
@@ -822,6 +846,8 @@ export function StockProvider({ children }) {
       id: 'MOV-' + generateUUID(),
       productId: targetProduct.id,
       productName: targetProduct.name,
+      productSize: targetProduct.size,
+      productCode: targetProduct.code,
       type: 'ADJUSTMENT',
       quantity: diff,
       previousStock: prev,
@@ -833,7 +859,7 @@ export function StockProvider({ children }) {
     setProducts(updatedProducts);
     setMovements(prev => [newMovement, ...prev]);
 
-    showToast(`Stock adjusted for ${targetProduct.name}: ${prev} → ${next}`, 'info');
+    showToast(`Stock adjusted for ${targetProduct.name} (${targetProduct.size}): ${prev} → ${next}`, 'info');
     return true;
   };
 

@@ -98,7 +98,7 @@ export default function StockIn({ preselectedProductId, setActiveTab }) {
                   placeholder="Filter product dropdown..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="form-input search-input-sm"
+                  className="form-input search-input search-input-sm"
                 />
               </div>
               <select
@@ -108,11 +108,30 @@ export default function StockIn({ preselectedProductId, setActiveTab }) {
               >
                 {filteredDropdownProducts.map(p => (
                   <option key={p.id} value={p.id}>
-                    {p.name} ({p.size}) — Current Stock: {p.stock} units
+                    [{p.size}] {p.name} ({p.code}) — Current: {p.stock} units
                   </option>
                 ))}
               </select>
             </div>
+
+            {/* Prominent Selected Product Confirmation Card */}
+            {selectedProduct && (
+              <div className="stockin-selected-product-card mb-3">
+                <div className="selected-product-badge-wrap">
+                  <span className="selected-size-badge-large">{selectedProduct.size}</span>
+                </div>
+                <div className="selected-product-info">
+                  <div className="selected-product-name-row">
+                    <h4 className="selected-product-name">{selectedProduct.name}</h4>
+                  </div>
+                  <div className="selected-product-meta-row">
+                    <span className="font-mono text-xs product-code-badge">{selectedProduct.code}</span>
+                    <span className="text-xs text-muted">{selectedProduct.category}</span>
+                    <span className="text-xs text-primary font-bold">Current Stock: {currentStock} units</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Visual Formula Display (Core Principle of PDF) */}
             {selectedProduct && (
@@ -219,9 +238,14 @@ export default function StockIn({ preselectedProductId, setActiveTab }) {
                     <span className="movement-time text-xs text-muted">
                       {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(m.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                     </span>
+                  <div className="movement-product-row" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0.25rem 0' }}>
+                    <h4 className="movement-product-name" style={{ margin: 0 }}>{m.productName}</h4>
+                    {(m.productSize || products.find(p => p.id === m.productId)?.size) && (
+                      <span className="badge-tag" style={{ fontWeight: 700 }}>
+                        {m.productSize || products.find(p => p.id === m.productId)?.size}
+                      </span>
+                    )}
                   </div>
-                  <h4 className="movement-product-name">{m.productName}</h4>
-                  <div className="movement-footer">
                     <span className="movement-stock-shift">
                       Previous: {m.previousStock} → <strong>New: {m.newStock}</strong>
                     </span>

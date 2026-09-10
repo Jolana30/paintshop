@@ -864,6 +864,11 @@
   padding-right: 2rem;
 }
 
+.search-input-sm {
+  padding-left: 2.25rem !important;
+  font-size: 0.85rem;
+}
+
 .clear-search-btn {
   position: absolute;
   right: 0.75rem;
@@ -4692,26 +4697,95 @@
 }
 
 .wht-status-chip {
-  padding: 0.25rem 0.55rem;
+  padding: 0.35rem 0.65rem;
   border-radius: 6px;
   border: 1px solid #d1d5db;
   background: #ffffff;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: #4b5563;
   cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wht-status-chip:hover {
+  border-color: #9ca3af;
+  color: #1f2937;
 }
 
 .wht-status-chip.active-success {
-  background: #dcfce7;
-  border-color: #86efac;
-  color: #166534;
+  background: #166534 !important;
+  border-color: #14532d !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(22, 101, 52, 0.3);
 }
 
 .wht-status-chip.active-warning {
-  background: #fef9c3;
-  border-color: #fde047;
-  color: #854d0e;
+  background: #d97706 !important;
+  border-color: #b45309 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(217, 119, 6, 0.3);
+}
+
+/* Stock In Selected Product Confirmation Card */
+.stockin-selected-product-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 1rem;
+  background: #f0fdf4;
+  border: 1.5px solid #86efac;
+  border-radius: 8px;
+}
+
+.selected-product-badge-wrap {
+  flex-shrink: 0;
+}
+
+.selected-size-badge-large {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  padding: 0.35rem 0.75rem;
+  background: #166534;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 800;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 4px rgba(22, 101, 52, 0.2);
+}
+
+.selected-product-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.selected-product-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.selected-product-name {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.selected-product-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.3rem;
+  flex-wrap: wrap;
 }
 
 .form-input-sm {
