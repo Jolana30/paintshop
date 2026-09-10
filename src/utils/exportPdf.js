@@ -175,7 +175,7 @@ export function printSaleReceipt({ sale, shopName = 'Jotun Paint Store' }) {
       <td style="padding: 8px; border-bottom: 1px dashed #e2e8f0; font-size: 12px;">
         <strong>${item.productName}</strong>
         <div style="font-size: 11px; color: #64748b;">${item.size || ''} ${item.code ? '• ' + item.code : ''}</div>
-        ${item.colorantCost > 0 ? `<div style="font-size: 10px; color: #2563eb;">🎨 Colorant: +${formatEtb(item.colorantCost * 1.15)}</div>` : ''}
+        ${Number(item.colorantCost || item.colourant_cost || 0) > 0 ? `<div style="font-size: 10px; color: #2563eb;">🎨 Colorant: +${formatEtb(Number(item.colorantCost || item.colourant_cost || 0) * 1.15)} (inc VAT)</div>` : ''}
       </td>
       <td style="padding: 8px; border-bottom: 1px dashed #e2e8f0; font-size: 12px; text-align: center;">${item.quantity}</td>
       <td style="padding: 8px; border-bottom: 1px dashed #e2e8f0; font-size: 12px; text-align: right;">${formatEtb(item.unitPrice)}</td>

@@ -159,7 +159,7 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
       [""]
     ];
 
-    const headers = ["Sale ID", "Date", "Time", "Payment Type", "Product Code", "Product Name", "Size", "Quantity", "Unit Price (ETB)", "Subtotal (ETB)", "Sale Total (ETB)"];
+    const headers = ["Sale ID", "Date", "Time", "Payment Type", "Product Code", "Product Name", "Size", "Quantity", "Unit Price (ETB)", "Colourant Cost (ETB)", "Subtotal (ETB)", "Sale Total (ETB)"];
     const rows = [];
 
     filteredSales.forEach(sale => {
@@ -169,6 +169,7 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
       const payType = sale.paymentType || sale.customer || 'Cash';
 
       sale.items.forEach(item => {
+        const colorantVal = Number(item.colorantCost || item.colourant_cost || 0);
         rows.push([
           sale.id,
           dateStr,
@@ -178,9 +179,10 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
           item.productName,
           item.size,
           item.quantity,
-          item.unitPrice.toFixed(2),
-          item.subtotal.toFixed(2),
-          sale.total.toFixed(2)
+          Number(item.unitPrice || 0).toFixed(2),
+          colorantVal.toFixed(2),
+          Number(item.subtotal || 0).toFixed(2),
+          Number(sale.total || 0).toFixed(2)
         ]);
       });
     });
@@ -200,7 +202,10 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
     const columns = ["Receipt #", "Date & Time", "Payment Type", "Items Purchased", "Units", "Total (ETB)"];
     const rows = filteredSales.map(sale => {
       const dt = new Date(sale.timestamp);
-      const itemsSummary = sale.items.map(i => `${i.quantity}x ${i.productName} (${i.size})`).join('<br/>');
+      const itemsSummary = sale.items.map(i => {
+        const colorantVal = Number(i.colorantCost || i.colourant_cost || 0);
+        return `${i.quantity}x ${i.productName} (${i.size})${colorantVal > 0 ? ` + Tint: ${formatCurrency(colorantVal * 1.15)}` : ''}`;
+      }).join('<br/>');
       const payType = sale.paymentType || sale.customer || 'Cash';
 
       return [
@@ -818,9 +823,9 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
                     <div>
                       <span className="font-semibold text-xs">{item.productName}</span>
                       <div className="text-xs text-muted">{item.size} • {item.code}</div>
-                      {item.colorantCost > 0 && (
+                      {Number(item.colorantCost || item.colourant_cost || 0) > 0 && (
                         <div className="text-xs text-primary" style={{ fontWeight: 600 }}>
-                          🎨 Colorant: +{formatCurrency(item.colorantCost * 1.15)} (inc VAT)
+                          🎨 Colorant: +{formatCurrency(Number(item.colorantCost || item.colourant_cost || 0) * 1.15)} (inc VAT)
                         </div>
                       )}
                     </div>

@@ -7,12 +7,14 @@ import {
   BarChart3Icon,
   AlertTriangleIcon,
   PaintBucketIcon,
-  RefreshCwIcon
+  RefreshCwIcon,
+  SunIcon,
+  MoonIcon
 } from './Icons';
 import { useStock } from '../context/StockContext';
 
 export default function Navigation({ activeTab, setActiveTab }) {
-  const { lowStockProducts, refreshData, cloudStatus, currentShop, logoutShop } = useStock();
+  const { lowStockProducts, refreshData, cloudStatus, currentShop, logoutShop, isDarkMode, toggleTheme } = useStock();
   const lowCount = lowStockProducts.length;
 
   const navItems = [
@@ -95,6 +97,17 @@ export default function Navigation({ activeTab, setActiveTab }) {
             </div>
           )}
 
+          {/* Dark / Light Theme Toggle */}
+          <button
+            type="button"
+            className="btn-theme-toggle mb-2"
+            onClick={toggleTheme}
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDarkMode ? <SunIcon size={16} className="text-warning" /> : <MoonIcon size={16} />}
+            <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+
           {/* Sync Catalog Button */}
           <button
             type="button"
@@ -134,6 +147,15 @@ export default function Navigation({ activeTab, setActiveTab }) {
         </div>
 
         <div className="mobile-header-actions">
+          <button
+            type="button"
+            className="mobile-theme-btn"
+            onClick={toggleTheme}
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDarkMode ? <SunIcon size={16} className="text-warning" /> : <MoonIcon size={16} />}
+          </button>
+
           <button
             type="button"
             className="mobile-refresh-btn"

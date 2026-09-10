@@ -139,14 +139,10 @@ export const supabaseAuth = {
         email
       };
     } catch (err) {
-      // Supabase free-tier email rate limit (429) or SMTP throttling:
-      // Gracefully preserve the registration without throwing an exception or blocking the user!
-      console.warn('[Supabase Auth SignUp Handled]', err.message || err);
+      console.error('[Supabase Auth SignUp Failed]', err.message || err);
       return {
-        success: true,
-        user: { id: fallbackShop.id, email },
-        shop: fallbackShop,
-        requireEmailConfirmation: false,
+        success: false,
+        error: err.message || 'Registration failed on server.',
         email
       };
     }
@@ -306,6 +302,8 @@ export const supabaseApi = {
       quantity: item.quantity,
       unit_price: item.unitPrice,
       price_before_vat: item.priceBeforeVat || 0,
+      colourant_cost: Number(item.colorantCost || item.colourant_cost || item.colourantCost || 0),
+      colorant_cost: Number(item.colorantCost || item.colourant_cost || item.colourantCost || 0),
       subtotal: item.subtotal
     }));
 
@@ -354,30 +352,12 @@ export const supabaseApi = {
   },
 
   /**
-   * Super Admin approval: Calls secure server RPC to approve and activate shop
+   * Super Admin approval & status change: Calls secure server RPC to approve, activate, or suspend shop
    */
   async updateShopStatus(shopId, status) {
     if (!isSupabaseConfigured) return true;
     if (!shopId || !isValidUUID(shopId)) return true;
-    if (status === 'active') {
-      try {
-        await callRpc('activate_my_shop');
-        return true;
-      } catch {
-        try {
-          return await callRpc('admin_approve_shop', { target_shop_id: shopId });
-        } catch {
-          return true;
-        }
-      }
-    }
-    return fetchFromSupabase(`shops?id=eq.${encodeURIComponent(shopId)}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        status,
-        updated_at: new Date().toISOString()
-      })
-    });
+    return await callRpc('admin_set_shop_status', { target_shop_id: shopId, p_status: status });
   },
 
   /**

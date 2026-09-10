@@ -230,14 +230,10 @@ export default function NewSale({ setActiveTab }) {
   const WHT_MINIMUM_THRESHOLD = 20000;
   const cartGrossTotal = cartTotal;
   const isWhtEligible = cartGrossTotal >= WHT_MINIMUM_THRESHOLD;
+  const effectiveIsWithholding = isWithholding && isWhtEligible;
 
-  // Auto-reset withholding if cart falls below threshold (pure render-time state adjustment)
-  if (isWithholding && !isWhtEligible) {
-    setIsWithholding(false);
-  }
-
-  const cartWhtAmount = (isWithholding && isWhtEligible) ? Math.round((cartGrossTotal * 0.03) * 100) / 100 : 0;
-  const cartNetPayable = (isWithholding && isWhtEligible) ? (cartGrossTotal - cartWhtAmount) : cartGrossTotal;
+  const cartWhtAmount = effectiveIsWithholding ? Math.round((cartGrossTotal * 0.03) * 100) / 100 : 0;
+  const cartNetPayable = effectiveIsWithholding ? (cartGrossTotal - cartWhtAmount) : cartGrossTotal;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -264,7 +260,7 @@ export default function NewSale({ setActiveTab }) {
       }
     }
 
-    if (isWithholding && isWhtEligible && !customerPhone.trim()) {
+    if (effectiveIsWithholding && !customerPhone.trim()) {
       showToast("Contact phone number is required for withholding voucher follow-up.", 'warning');
       return;
     }
@@ -278,7 +274,7 @@ export default function NewSale({ setActiveTab }) {
     setIsSubmitting(true);
     try {
       const completed = await processSale(cart, paymentType, {
-        isWithholding: isWithholding && isWhtEligible,
+        isWithholding: effectiveIsWithholding,
         withholdingRate: 3.0,
         withholdingAmount: cartWhtAmount,
         netPayable: cartNetPayable,
@@ -286,7 +282,7 @@ export default function NewSale({ setActiveTab }) {
         customerTin: customerTin.trim() || null,
         customerPhone: customerPhone.trim() || null,
         whtVoucherNumber: whtVoucherNumber.trim() || null,
-        whtVoucherStatus: (isWithholding && isWhtEligible) ? whtVoucherStatus : 'not_applicable'
+        whtVoucherStatus: effectiveIsWithholding ? whtVoucherStatus : 'not_applicable'
       });
 
       if (completed) {

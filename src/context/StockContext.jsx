@@ -36,6 +36,30 @@ export function StockProvider({ children }) {
   const [toast, setToast] = useState(null);
   const [authError, setAuthError] = useState(null);
 
+  // Theme State (Dark / Light) with system preference fallback and localStorage persistence
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('paintflow_theme');
+    if (saved === 'dark' || saved === 'light') return saved;
+    if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'light';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('paintflow_theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
+    if (theme === 'dark') {
+      document.body.classList.add('dark-theme');
+    } else {
+      document.body.classList.remove('dark-theme');
+    }
+  }, [theme]);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
+
   // 1. Multi-Shop Registry & Active Session
   const [allShops, setAllShops] = useState(() => {
     const saved = localStorage.getItem('paintflow_all_shops');
@@ -256,6 +280,8 @@ export function StockProvider({ children }) {
             quantity: si.quantity,
             unitPrice: Number(si.unit_price),
             priceBeforeVat: Number(si.price_before_vat),
+            colourant_cost: Number(si.colourant_cost || si.colorant_cost || 0),
+            colorantCost: Number(si.colourant_cost || si.colorant_cost || 0),
             subtotal: Number(si.subtotal)
           })) : [],
           totalItems: s.total_items,
@@ -282,6 +308,10 @@ export function StockProvider({ children }) {
           id: m.id,
           productId: m.product_id,
           productName: m.product_name,
+          productCode: m.product_code || m.code || '',
+          productSize: m.product_size || m.size || '',
+          code: m.product_code || m.code || '',
+          size: m.product_size || m.size || '',
           type: m.type,
           quantity: m.quantity,
           previousStock: m.previous_stock,
@@ -409,17 +439,16 @@ export function StockProvider({ children }) {
           return true;
         }
       } catch (err) {
-        console.warn('Cloud login notice:', err.message);
-        // If cloud login fails (e.g. rate-limit or network), check registered allShops
-        const foundShop = allShops.find(s => s.email?.toLowerCase() === email.toLowerCase());
-        if (foundShop) {
-          setCurrentShop(foundShop);
-          if (foundShop.status === 'active') {
+        console.error('Cloud login failed:', err.message);
+        // Explicitly fail cloud login if credentials or server fails; do not silently bypass auth
+        const isDemoAccount = email.toLowerCase().includes('demo');
+        if (isDemoAccount) {
+          const foundShop = allShops.find(s => s.email?.toLowerCase() === email.toLowerCase());
+          if (foundShop) {
+            setCurrentShop(foundShop);
             showToast(`Welcome back, ${foundShop.name}!`, 'success');
-          } else {
-            showToast(`Signed in to ${foundShop.name}. Account is pending subscription activation.`, 'info');
+            return true;
           }
-          return true;
         }
         setAuthError(err.message || 'Invalid login credentials.');
         return false;
@@ -466,13 +495,29 @@ export function StockProvider({ children }) {
           tinNumber
         });
 
+        if (res && res.success === false) {
+          const errMsg = res.error || 'Registration failed on server.';
+          setAuthError(errMsg);
+          showToast(`Registration failed: ${errMsg}`, 'error');
+          return {
+            success: false,
+            message: errMsg
+          };
+        }
+
         if (res?.user?.id) {
           newShop.id = res.user.id;
         } else if (res?.shop?.id) {
           newShop.id = res.shop.id;
         }
       } catch (err) {
-        console.warn('Registration notice (handled):', err);
+        console.error('Registration failed:', err);
+        setAuthError(err.message || 'Registration failed on server.');
+        showToast(`Registration failed: ${err.message}`, 'error');
+        return {
+          success: false,
+          message: err.message
+        };
       }
     }
 
@@ -512,20 +557,8 @@ export function StockProvider({ children }) {
       return true;
     } catch (err) {
       console.error('Failed to approve shop:', err);
-      setAllShops(prev => prev.map(s => s.id === targetShopId ? { ...s, status: 'active' } : s));
-      const targetShop = allShops.find(s => s.id === targetShopId);
-      const isCurrentSession = currentShop && (currentShop.id === targetShopId || (currentShop.email && targetShop?.email && currentShop.email.toLowerCase() === targetShop.email.toLowerCase()));
-
-      if (isCurrentSession) {
-        const activeShop = { ...currentShop, status: 'active' };
-        setCurrentShop(activeShop);
-        localStorage.setItem('paintflow_current_shop', JSON.stringify(activeShop));
-        if (isSupabaseConfigured && !isDemoShop(activeShop)) {
-          await hydrateCloudData(activeShop);
-        }
-      }
-      showToast("Store activated and ready for counter sales.", "success");
-      return true;
+      showToast(`Failed to approve store: ${err.message}`, 'error');
+      return false;
     }
   };
 
@@ -546,14 +579,8 @@ export function StockProvider({ children }) {
       return true;
     } catch (err) {
       console.error('Failed to suspend shop:', err);
-      setAllShops(prev => prev.map(s => s.id === targetShopId ? { ...s, status: 'pending_approval' } : s));
-      if (currentShop && currentShop.id === targetShopId) {
-        const suspendedShop = { ...currentShop, status: 'pending_approval' };
-        setCurrentShop(suspendedShop);
-        localStorage.setItem('paintflow_current_shop', JSON.stringify(suspendedShop));
-      }
-      showToast("Store status set to pending.", "info");
-      return true;
+      showToast(`Failed to suspend store: ${err.message}`, 'error');
+      return false;
     }
   };
 
@@ -647,14 +674,27 @@ export function StockProvider({ children }) {
       return prod;
     });
 
-    // Record stock movements
+    // Sanitize cart items with explicit colourant cost
+    const sanitizedCartItems = cartItems.map(item => ({
+      ...item,
+      colorantCost: Number(item.colorantCost || item.colourant_cost || 0),
+      colourant_cost: Number(item.colorantCost || item.colourant_cost || 0)
+    }));
+
+    // Record stock movements with immutable product code and size
     const newMovements = cartItems.map(item => {
       const prod = products.find(p => p.id === item.productId);
       const prev = prod ? prod.stock : 0;
+      const code = prod ? prod.code : (item.code || '');
+      const size = prod ? prod.size : (item.size || '');
       return {
         id: 'MOV-' + generateUUID(),
         productId: item.productId,
         productName: item.productName,
+        productCode: code,
+        productSize: size,
+        code,
+        size,
         type: 'SALE',
         quantity: -item.quantity,
         previousStock: prev,
@@ -670,7 +710,7 @@ export function StockProvider({ children }) {
       id: saleId,
       timestamp: now.toISOString(),
       localDate: getLocalDateString(now),
-      items: cartItems,
+      items: sanitizedCartItems,
       totalItems,
       total: grossTotal,
       grossTotal,
@@ -693,7 +733,7 @@ export function StockProvider({ children }) {
       try {
         const serverRes = await supabaseApi.recordSale({
           sale: newSale,
-          items: cartItems
+          items: sanitizedCartItems
         });
         if (serverRes?.gross_total !== undefined) {
           newSale.grossTotal = Number(serverRes.gross_total);
@@ -795,6 +835,8 @@ export function StockProvider({ children }) {
       productName: targetProduct.name,
       productSize: targetProduct.size,
       productCode: targetProduct.code,
+      code: targetProduct.code,
+      size: targetProduct.size,
       type: 'STOCK_IN',
       quantity: qty,
       previousStock: prev,
@@ -848,6 +890,8 @@ export function StockProvider({ children }) {
       productName: targetProduct.name,
       productSize: targetProduct.size,
       productCode: targetProduct.code,
+      code: targetProduct.code,
+      size: targetProduct.size,
       type: 'ADJUSTMENT',
       quantity: diff,
       previousStock: prev,
@@ -1015,7 +1059,11 @@ export function StockProvider({ children }) {
         cloudStatus,
         toast,
         showToast,
-        formatCurrency
+        formatCurrency,
+
+        theme,
+        toggleTheme,
+        isDarkMode: theme === 'dark'
       }}
     >
       {children}

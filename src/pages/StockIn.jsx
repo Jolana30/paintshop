@@ -238,11 +238,16 @@ export default function StockIn({ preselectedProductId, setActiveTab }) {
                     <span className="movement-time text-xs text-muted">
                       {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(m.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                     </span>
-                  <div className="movement-product-row" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0.25rem 0' }}>
+                  <div className="movement-product-row" style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: '0.25rem 0', flexWrap: 'wrap' }}>
                     <h4 className="movement-product-name" style={{ margin: 0 }}>{m.productName}</h4>
-                    {(m.productSize || products.find(p => p.id === m.productId)?.size) && (
+                    {(m.productCode || m.code || products.find(p => p.id === m.productId)?.code) && (
+                      <span className="badge-tag" style={{ fontFamily: 'monospace', fontSize: '11px' }}>
+                        {m.productCode || m.code || products.find(p => p.id === m.productId)?.code}
+                      </span>
+                    )}
+                    {(m.productSize || m.size || products.find(p => p.id === m.productId)?.size) && (
                       <span className="badge-tag" style={{ fontWeight: 700 }}>
-                        {m.productSize || products.find(p => p.id === m.productId)?.size}
+                        {m.productSize || m.size || products.find(p => p.id === m.productId)?.size}
                       </span>
                     )}
                   </div>

@@ -4,7 +4,9 @@ import {
   PaintBucketIcon,
   CheckCircleIcon,
   SearchIcon,
-  RefreshCwIcon
+  RefreshCwIcon,
+  SunIcon,
+  MoonIcon
 } from '../components/Icons';
 
 export default function AdminPage({ onBackToApp }) {
@@ -14,7 +16,9 @@ export default function AdminPage({ onBackToApp }) {
     suspendShop,
     deleteShop,
     refreshData,
-    showToast
+    showToast,
+    isDarkMode,
+    toggleTheme
   } = useStock();
 
   const [adminPin, setAdminPin] = useState('');
@@ -145,7 +149,7 @@ export default function AdminPage({ onBackToApp }) {
 
   // Authenticated Super Admin Management Console
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', padding: '1.5rem 1rem' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-app)', padding: '1.5rem 1rem' }}>
       <div style={{ maxWidth: '1060px', margin: '0 auto' }}>
         {/* Top Header Bar */}
         <div style={{
@@ -184,6 +188,17 @@ export default function AdminPage({ onBackToApp }) {
           </div>
 
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ background: 'rgba(255, 255, 255, 0.1)', color: '#ffffff', border: 'none', padding: '0.5rem 0.85rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', borderRadius: '6px' }}
+              onClick={toggleTheme}
+              title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {isDarkMode ? <SunIcon size={14} className="text-warning" /> : <MoonIcon size={14} />}
+              <span>{isDarkMode ? 'Light' : 'Dark'}</span>
+            </button>
+
             <button
               type="button"
               className="btn-secondary"

@@ -11,6 +11,7 @@ import { printOrSaveAsPdf } from '../utils/exportPdf';
 export default function Reports() {
   const {
     products,
+    sales,
     withheldSales,
     movements,
     todayRevenue,
@@ -22,6 +23,11 @@ export default function Reports() {
   } = useStock();
 
   const [activeSubTab, setActiveSubTab] = useState('summary'); // 'summary', 'audit', 'withholding'
+
+  // Total machine-dispensed colourant revenue across sales
+  const totalColorantRevenue = (sales || []).reduce((sum, s) =>
+    sum + (s.items || []).reduce((isum, i) => isum + Number(i.colorantCost || i.colourant_cost || 0), 0), 0
+  );
 
   // Export Withholding Tax Ledger to Excel (Ministry of Revenues Format)
   const handleExportWhtExcel = () => {
@@ -125,21 +131,24 @@ export default function Reports() {
         { label: "Today's Revenue", value: formatCurrency(todayRevenue) },
         { label: "Units Sold Today", value: todayItemsSold },
         { label: "Total Units in Shop", value: totalStockUnits },
-        { label: "Total Inventory Value", value: formatCurrency(totalInventoryValue) }
+        { label: "Total Inventory Value", value: formatCurrency(totalInventoryValue) },
+        { label: "Total Tinting Revenue (excl. VAT)", value: formatCurrency(totalColorantRevenue) }
       ]
     });
   };
 
   // Export Audit Trail to Excel
   const handleExportAuditExcel = () => {
-    const headers = ["Movement ID", "Date", "Time", "Product Name", "Event Type", "Quantity Change", "Previous Stock", "New Stock", "Reference / Reason"];
+    const headers = ["Movement ID", "Date", "Time", "Product Code", "Product Name", "Size", "Event Type", "Quantity Change", "Previous Stock", "New Stock", "Reference / Reason"];
     const rows = movements.map(m => {
       const dt = new Date(m.timestamp);
       return [
         m.id,
         dt.toLocaleDateString(),
         dt.toLocaleTimeString(),
+        m.productCode || m.code || '',
         m.productName,
+        m.productSize || m.size || '',
         m.type,
         m.quantity,
         m.previousStock,
@@ -153,12 +162,14 @@ export default function Reports() {
 
   // Export Audit Trail to PDF
   const handleExportAuditPdf = () => {
-    const columns = ["Timestamp", "Product", "Type", "Change", "Shift", "Reference / Note"];
+    const columns = ["Timestamp", "Code", "Product", "Size", "Type", "Change", "Shift", "Reference / Note"];
     const rows = filteredMovements.map(m => {
       const dt = new Date(m.timestamp);
       return [
         `${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        `<span style="font-family: monospace; font-size: 11px;">${m.productCode || m.code || '-'}</span>`,
         `<strong>${m.productName}</strong>`,
+        `<span style="font-size: 11px;">${m.productSize || m.size || '-'}</span>`,
         m.type,
         `<span style="color:${m.quantity > 0 ? '#059669' : '#dc2626'}; font-weight:bold;">${m.quantity > 0 ? `+${m.quantity}` : m.quantity}</span>`,
         `${m.previousStock} ➔ ${m.newStock}`,
@@ -321,6 +332,17 @@ export default function Reports() {
                 <span className="stat-subtext">At retail VAT price</span>
               </div>
             </div>
+
+            <div className="stat-card">
+              <div className="stat-icon-wrap bg-amber-subtle text-warning">
+                <BarChart3Icon size={22} />
+              </div>
+              <div className="stat-content">
+                <span className="stat-label">Total Tinting Revenue</span>
+                <span className="stat-value">{formatCurrency(totalColorantRevenue)}</span>
+                <span className="stat-subtext">Dispensed colourant (excl. VAT)</span>
+              </div>
+            </div>
           </div>
 
           {/* End-of-Day Closing Stock Table */}
@@ -433,6 +455,7 @@ export default function Reports() {
                 <tr>
                   <th>Timestamp</th>
                   <th>Product</th>
+                  <th>Size</th>
                   <th>Event Type</th>
                   <th>Change</th>
                   <th>Stock Shift</th>
@@ -451,6 +474,12 @@ export default function Reports() {
                       </td>
                       <td>
                         <strong>{m.productName}</strong>
+                        {(m.productCode || m.code) && (
+                          <div className="text-xs text-muted font-mono">{m.productCode || m.code}</div>
+                        )}
+                      </td>
+                      <td>
+                        <span className="badge-tag">{m.productSize || m.size || '-'}</span>
                       </td>
                       <td>
                         <span className={`badge-pill ${isSale ? 'badge-neutral' : isStockIn ? 'badge-healthy' : 'badge-warning'}`}>

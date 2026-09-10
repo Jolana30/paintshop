@@ -100,6 +100,7 @@ CREATE TABLE sale_items (
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     unit_price NUMERIC(10, 2) NOT NULL,
     price_before_vat NUMERIC(10, 2) NOT NULL,
+    colourant_cost NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
     subtotal NUMERIC(12, 2) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -110,6 +111,10 @@ CREATE TABLE stock_movements (
     shop_id UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
     product_id TEXT NOT NULL,
     product_name TEXT NOT NULL,
+    product_code TEXT,
+    product_size TEXT,
+    code TEXT,
+    size TEXT,
     type TEXT NOT NULL CHECK (type IN ('SALE', 'STOCK_IN', 'ADJUSTMENT')),
     quantity INTEGER NOT NULL,
     previous_stock INTEGER NOT NULL,
@@ -224,36 +229,14 @@ BEGIN
         COALESCE(NEW.raw_user_meta_data->>'city_address', ''),
         NULLIF(NEW.raw_user_meta_data->>'tin_number', ''),
         NEW.email,
-        'active'
+        'pending_approval'
     )
-    ON CONFLICT (id) DO UPDATE
-    SET status = 'active';
+    ON CONFLICT (id) DO NOTHING;
 
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp;
-
--- Allow authenticated shop owner to self-activate immediately
-CREATE OR REPLACE FUNCTION public.activate_my_shop()
-RETURNS JSONB AS $$
-DECLARE
-    v_shop_id UUID := auth.uid();
-BEGIN
-    IF v_shop_id IS NULL THEN
-        RAISE EXCEPTION 'Unauthorized: User is not authenticated';
-    END IF;
-
-    UPDATE public.shops
-    SET status = 'active', updated_at = NOW()
-    WHERE id = v_shop_id;
-
-    RETURN jsonb_build_object('success', true, 'shop_id', v_shop_id, 'status', 'active');
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public, pg_temp;
-
-GRANT EXECUTE ON FUNCTION public.activate_my_shop() TO authenticated;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -306,11 +289,13 @@ DECLARE
     v_inv RECORD;
     v_qty INT;
     v_prod_id TEXT;
+    v_item_colorant NUMERIC(10, 2);
     v_auth_pbv NUMERIC(10, 2);
     v_auth_pwv NUMERIC(10, 2);
     v_auth_name TEXT;
     v_auth_code TEXT;
     v_auth_size TEXT;
+    v_line_pbv NUMERIC(12, 2);
     v_line_subtotal NUMERIC(12, 2);
     v_calculated_gross NUMERIC(12, 2) := 0.00;
     v_calculated_items INT := 0;
@@ -344,14 +329,21 @@ BEGIN
 
     FOR v_item IN SELECT * FROM jsonb_to_recordset(p_items) AS x(
         product_id TEXT,
-        quantity INT
+        quantity INT,
+        colorant_cost NUMERIC,
+        colourant_cost NUMERIC
     )
     LOOP
         v_prod_id := v_item.product_id;
         v_qty := v_item.quantity;
+        v_item_colorant := COALESCE(v_item.colourant_cost, v_item.colorant_cost, 0.00);
 
         IF v_qty IS NULL OR v_qty <= 0 THEN
             RAISE EXCEPTION 'Invalid quantity % for item %', v_qty, v_prod_id;
+        END IF;
+
+        IF v_item_colorant < 0 THEN
+            RAISE EXCEPTION 'Colourant cost cannot be negative for item %', v_prod_id;
         END IF;
 
         -- Lock inventory row for update
@@ -378,8 +370,8 @@ BEGIN
             FROM master_products
             WHERE id = v_inv.master_product_id;
         ELSE
-            v_auth_pbv := COALESCE(v_inv.custom_price_before_vat, 0.00);
             v_auth_pwv := v_inv.custom_price_with_vat;
+            v_auth_pbv := COALESCE(v_inv.custom_price_before_vat, ROUND(v_auth_pwv / 1.15, 2));
             v_auth_name := v_inv.custom_name;
             v_auth_code := v_inv.custom_code;
             v_auth_size := v_inv.custom_size;
@@ -389,7 +381,15 @@ BEGIN
             RAISE EXCEPTION 'Authoritative price not found for product %', v_prod_id;
         END IF;
 
-        v_line_subtotal := ROUND(v_qty * v_auth_pwv, 2);
+        -- Calculate authoritative subtotal including colourant cost (Jotun Colour Manager pricing model)
+        IF v_item_colorant > 0 THEN
+            v_line_pbv := (v_auth_pbv * v_qty) + v_item_colorant;
+            v_line_subtotal := TRUNC(v_line_pbv * 1.15, 2);
+        ELSE
+            v_line_pbv := v_auth_pbv * v_qty;
+            v_line_subtotal := ROUND(v_qty * v_auth_pwv, 2);
+        END IF;
+
         v_calculated_gross := v_calculated_gross + v_line_subtotal;
         v_calculated_items := v_calculated_items + v_qty;
 
@@ -411,6 +411,7 @@ BEGIN
             quantity,
             unit_price,
             price_before_vat,
+            colourant_cost,
             subtotal,
             created_at
         ) VALUES (
@@ -423,6 +424,7 @@ BEGIN
             v_qty,
             v_auth_pwv,
             v_auth_pbv,
+            v_item_colorant,
             v_line_subtotal,
             v_now
         );
@@ -432,6 +434,10 @@ BEGIN
             shop_id,
             product_id,
             product_name,
+            product_code,
+            product_size,
+            code,
+            size,
             type,
             quantity,
             previous_stock,
@@ -443,11 +449,15 @@ BEGIN
             v_shop_id,
             v_prod_id,
             v_auth_name,
+            v_auth_code,
+            v_auth_size,
+            v_auth_code,
+            v_auth_size,
             'SALE',
             -v_qty,
             v_prev_stock,
             v_new_stock,
-            v_sale_id,
+            COALESCE(p_sale->>'reference', 'Sale #' || RIGHT(v_sale_id, 8), v_sale_id),
             v_now
         );
     END LOOP;
@@ -528,6 +538,8 @@ DECLARE
     v_prev_stock INT;
     v_new_stock INT;
     v_prod_name TEXT;
+    v_prod_code TEXT;
+    v_prod_size TEXT;
     v_now TIMESTAMPTZ := NOW();
 BEGIN
     v_shop_id := auth.uid();
@@ -552,7 +564,18 @@ BEGIN
 
     v_prev_stock := v_inv.stock;
     v_new_stock := v_prev_stock + p_quantity;
-    v_prod_name := COALESCE(v_inv.custom_name, (SELECT name FROM master_products WHERE id = v_inv.master_product_id), 'Paint Product');
+
+    IF v_inv.master_product_id IS NOT NULL THEN
+        SELECT name, code, size INTO v_prod_name, v_prod_code, v_prod_size
+        FROM master_products
+        WHERE id = v_inv.master_product_id;
+    ELSE
+        v_prod_name := v_inv.custom_name;
+        v_prod_code := v_inv.custom_code;
+        v_prod_size := v_inv.custom_size;
+    END IF;
+
+    v_prod_name := COALESCE(v_prod_name, 'Paint Product');
 
     UPDATE shop_inventory
     SET stock = v_new_stock,
@@ -564,6 +587,10 @@ BEGIN
         shop_id,
         product_id,
         product_name,
+        product_code,
+        product_size,
+        code,
+        size,
         type,
         quantity,
         previous_stock,
@@ -575,6 +602,10 @@ BEGIN
         v_shop_id,
         p_product_id,
         v_prod_name,
+        v_prod_code,
+        v_prod_size,
+        v_prod_code,
+        v_prod_size,
         'STOCK_IN',
         p_quantity,
         v_prev_stock,
@@ -586,6 +617,9 @@ BEGIN
     RETURN jsonb_build_object(
         'success', true,
         'product_id', p_product_id,
+        'product_name', v_prod_name,
+        'product_code', v_prod_code,
+        'product_size', v_prod_size,
         'previous_stock', v_prev_stock,
         'new_stock', v_new_stock
     );
@@ -606,6 +640,8 @@ DECLARE
     v_prev_stock INT;
     v_diff INT;
     v_prod_name TEXT;
+    v_prod_code TEXT;
+    v_prod_size TEXT;
     v_now TIMESTAMPTZ := NOW();
 BEGIN
     v_shop_id := auth.uid();
@@ -630,7 +666,18 @@ BEGIN
 
     v_prev_stock := v_inv.stock;
     v_diff := p_new_stock - v_prev_stock;
-    v_prod_name := COALESCE(v_inv.custom_name, (SELECT name FROM master_products WHERE id = v_inv.master_product_id), 'Paint Product');
+
+    IF v_inv.master_product_id IS NOT NULL THEN
+        SELECT name, code, size INTO v_prod_name, v_prod_code, v_prod_size
+        FROM master_products
+        WHERE id = v_inv.master_product_id;
+    ELSE
+        v_prod_name := v_inv.custom_name;
+        v_prod_code := v_inv.custom_code;
+        v_prod_size := v_inv.custom_size;
+    END IF;
+
+    v_prod_name := COALESCE(v_prod_name, 'Paint Product');
 
     UPDATE shop_inventory
     SET stock = p_new_stock,
@@ -642,6 +689,10 @@ BEGIN
         shop_id,
         product_id,
         product_name,
+        product_code,
+        product_size,
+        code,
+        size,
         type,
         quantity,
         previous_stock,
@@ -653,6 +704,10 @@ BEGIN
         v_shop_id,
         p_product_id,
         v_prod_name,
+        v_prod_code,
+        v_prod_size,
+        v_prod_code,
+        v_prod_size,
         'ADJUSTMENT',
         v_diff,
         v_prev_stock,
@@ -664,6 +719,9 @@ BEGIN
     RETURN jsonb_build_object(
         'success', true,
         'product_id', p_product_id,
+        'product_name', v_prod_name,
+        'product_code', v_prod_code,
+        'product_size', v_prod_size,
         'previous_stock', v_prev_stock,
         'new_stock', p_new_stock,
         'difference', v_diff
@@ -880,10 +938,69 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp;
 
+-- RPC 7: Administrative Store Status Management (Approve, Suspend, Pending with Audit Log)
+CREATE OR REPLACE FUNCTION public.admin_set_shop_status(
+    target_shop_id UUID,
+    p_status TEXT
+)
+RETURNS JSONB AS $$
+DECLARE
+    v_old_status TEXT;
+    v_new_status TEXT;
+    v_caller_role TEXT := auth.role();
+    v_is_admin BOOLEAN := COALESCE((auth.jwt()->'app_metadata'->>'is_admin')::BOOLEAN, FALSE);
+    v_approver_id UUID := auth.uid();
+BEGIN
+    IF p_status NOT IN ('active', 'pending_approval', 'suspended') THEN
+        RAISE EXCEPTION 'Invalid shop status: %', p_status;
+    END IF;
+
+    v_new_status := p_status;
+
+    SELECT status INTO v_old_status
+    FROM shops
+    WHERE id = target_shop_id;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Shop with ID % not found', target_shop_id;
+    END IF;
+
+    UPDATE shops
+    SET status = v_new_status,
+        updated_at = NOW()
+    WHERE id = target_shop_id;
+
+    INSERT INTO shop_approval_audit (
+        target_shop_id,
+        approver_id,
+        approver_role,
+        old_status,
+        new_status,
+        created_at
+    ) VALUES (
+        target_shop_id,
+        v_approver_id,
+        CASE WHEN v_is_admin THEN 'admin_user' ELSE 'service_role' END,
+        v_old_status,
+        v_new_status,
+        NOW()
+    );
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'shop_id', target_shop_id,
+        'old_status', v_old_status,
+        'new_status', v_new_status
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp;
+
 -- S-04: Enforce Least-Privilege Execution Grants
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon;
 REVOKE ALL ON FUNCTION admin_approve_shop(UUID, UUID) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION admin_set_shop_status(UUID, TEXT) FROM PUBLIC, anon;
 
 GRANT EXECUTE ON FUNCTION is_active_shop() TO authenticated;
 GRANT EXECUTE ON FUNCTION record_sale_transaction(JSONB, JSONB) TO authenticated;
@@ -893,6 +1010,7 @@ GRANT EXECUTE ON FUNCTION add_custom_product_transaction(TEXT, TEXT, TEXT, TEXT,
 GRANT EXECUTE ON FUNCTION update_wht_voucher_transaction(TEXT, TEXT, TEXT) TO authenticated;
 
 GRANT EXECUTE ON FUNCTION admin_approve_shop(UUID, UUID) TO service_role;
+GRANT EXECUTE ON FUNCTION admin_set_shop_status(UUID, TEXT) TO authenticated, service_role;
 
 -- ==============================================================================
 -- 11. Seed All 46 Official Jotun Paint Products into master_products

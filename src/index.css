@@ -36,6 +36,40 @@
   --radius-lg: 14px;
 }
 
+[data-theme="dark"], body.dark-theme {
+  --bg-app: #0b1120;
+  --bg-surface: #1e293b;
+  --bg-surface-secondary: #0f172a;
+  --border-color: #334155;
+  --border-hover: #475569;
+
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-light: #64748b;
+
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --primary-subtle: rgba(59, 130, 246, 0.18);
+
+  --success: #10b981;
+  --success-hover: #34d399;
+  --success-subtle: rgba(16, 185, 129, 0.18);
+
+  --warning: #f59e0b;
+  --warning-subtle: rgba(245, 158, 11, 0.18);
+
+  --danger: #ef4444;
+  --danger-hover: #f87171;
+  --danger-subtle: rgba(239, 68, 68, 0.18);
+
+  --purple: #a855f7;
+  --purple-subtle: rgba(168, 85, 247, 0.18);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

@@ -4,7 +4,9 @@ import {
   PaintBucketIcon,
   CheckCircleIcon,
   EyeIcon,
-  EyeOffIcon
+  EyeOffIcon,
+  SunIcon,
+  MoonIcon
 } from '../components/Icons';
 
 export default function AuthPage() {
@@ -16,7 +18,9 @@ export default function AuthPage() {
     authError,
     clearAuthError,
     refreshData,
-    showToast
+    showToast,
+    isDarkMode,
+    toggleTheme
   } = useStock();
 
   const [activeTab, setActiveTab] = useState('login'); // 'login' | 'register'
@@ -248,6 +252,16 @@ export default function AuthPage() {
 
   return (
     <div className="auth-fullscreen-container">
+      {/* Floating Theme Toggle */}
+      <button
+        type="button"
+        className="auth-floating-theme-toggle"
+        onClick={toggleTheme}
+        title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+      >
+        {isDarkMode ? <SunIcon size={18} className="text-warning" /> : <MoonIcon size={18} />}
+      </button>
+
       <div className="auth-card-wrapper">
         {/* Left Presentation Hero */}
         <div className="auth-hero-panel">
