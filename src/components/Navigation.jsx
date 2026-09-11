@@ -97,17 +97,6 @@ export default function Navigation({ activeTab, setActiveTab }) {
             </div>
           )}
 
-          {/* Dark / Light Theme Toggle */}
-          <button
-            type="button"
-            className="btn-theme-toggle mb-2"
-            onClick={toggleTheme}
-            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
-          >
-            {isDarkMode ? <SunIcon size={16} className="text-warning" /> : <MoonIcon size={16} />}
-            <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
-          </button>
-
           {/* Sync Catalog Button */}
           <button
             type="button"
@@ -152,6 +141,7 @@ export default function Navigation({ activeTab, setActiveTab }) {
             className="mobile-theme-btn"
             onClick={toggleTheme}
             title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
           >
             {isDarkMode ? <SunIcon size={16} className="text-warning" /> : <MoonIcon size={16} />}
           </button>

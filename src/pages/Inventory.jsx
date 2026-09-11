@@ -7,7 +7,9 @@ import {
   RefreshCwIcon,
   CheckCircleIcon,
   MinusIcon,
-  AlertTriangleIcon
+  AlertTriangleIcon,
+  SunIcon,
+  MoonIcon
 } from '../components/Icons';
 import { downloadExcelCsv } from '../utils/exportExcel';
 import { printOrSaveAsPdf } from '../utils/exportPdf';
@@ -19,7 +21,9 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
     todayItemsSold,
     getSoldToday,
     processStockAdjustment,
-    refreshData
+    refreshData,
+    isDarkMode,
+    toggleTheme
   } = useStock();
 
   const safeGetSoldToday = (id) => (typeof getSoldToday === 'function' ? getSoldToday(id) : 0);
@@ -286,6 +290,15 @@ export default function Inventory({ setActiveTab, onSelectStockInProduct }) {
           >
             <PlusIcon size={18} />
             + Receive Stock
+          </button>
+          <button
+            type="button"
+            className="btn-theme-toggle-icon"
+            onClick={toggleTheme}
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDarkMode ? <SunIcon size={18} className="text-warning" /> : <MoonIcon size={18} />}
           </button>
         </div>
       </div>

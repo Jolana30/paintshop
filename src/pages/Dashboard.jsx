@@ -6,11 +6,22 @@ import {
   BarChart3Icon,
   PackageIcon,
   AlertTriangleIcon,
-  ReceiptTextIcon
+  ReceiptTextIcon,
+  SunIcon,
+  MoonIcon
 } from '../components/Icons';
 
 export default function Dashboard({ setActiveTab, onSelectStockInProduct, onViewSalesForDate }) {
-  const { products, sales, todayRevenue, todayItemsSold, lowStockProducts, formatCurrency } = useStock();
+  const {
+    products,
+    sales,
+    todayRevenue,
+    todayItemsSold,
+    lowStockProducts,
+    formatCurrency,
+    isDarkMode,
+    toggleTheme
+  } = useStock();
 
   const recentSales = sales.slice(0, 5);
 
@@ -34,6 +45,15 @@ export default function Dashboard({ setActiveTab, onSelectStockInProduct, onView
           <span className="badge-pill date-pill">
             {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
+          <button
+            type="button"
+            className="btn-theme-toggle-icon"
+            onClick={toggleTheme}
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDarkMode ? <SunIcon size={18} className="text-warning" /> : <MoonIcon size={18} />}
+          </button>
         </div>
       </div>
 

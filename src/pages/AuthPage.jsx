@@ -258,6 +258,7 @@ export default function AuthPage() {
         className="auth-floating-theme-toggle"
         onClick={toggleTheme}
         title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
       >
         {isDarkMode ? <SunIcon size={18} className="text-warning" /> : <MoonIcon size={18} />}
       </button>

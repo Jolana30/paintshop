@@ -316,6 +316,52 @@
   flex-wrap: wrap;
 }
 
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.date-pill {
+  font-weight: 600;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.75rem;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+}
+
+.btn-theme-toggle-icon {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  flex: 0 0 36px;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.btn-theme-toggle-icon:hover {
+  background-color: var(--primary-subtle);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btn-theme-toggle-icon:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* Export Buttons with Distinct Labels */
 .btn-export-excel {
   background-color: #107c41; /* Microsoft Excel Emerald */
@@ -3474,6 +3520,10 @@
     flex: 1 1 auto;
     text-align: center;
     justify-content: center;
+  }
+
+  .btn-theme-toggle-icon {
+    display: none !important;
   }
 
   /* 5. Switch Table vs Native Cards Feeds */

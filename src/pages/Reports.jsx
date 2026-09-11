@@ -3,7 +3,9 @@ import { useStock } from '../context/StockContext';
 import {
   BarChart3Icon,
   ReceiptTextIcon,
-  PackageIcon
+  PackageIcon,
+  SunIcon,
+  MoonIcon
 } from '../components/Icons';
 import { downloadExcelCsv } from '../utils/exportExcel';
 import { printOrSaveAsPdf } from '../utils/exportPdf';
@@ -19,7 +21,9 @@ export default function Reports() {
     totalWithholdingCredits,
     pendingVouchersCount,
     currentShop,
-    formatCurrency
+    formatCurrency,
+    isDarkMode,
+    toggleTheme
   } = useStock();
 
   const [activeSubTab, setActiveSubTab] = useState('summary'); // 'summary', 'audit', 'withholding'
@@ -257,6 +261,15 @@ export default function Reports() {
               </button>
             </>
           )}
+          <button
+            type="button"
+            className="btn-theme-toggle-icon"
+            onClick={toggleTheme}
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDarkMode ? <SunIcon size={18} className="text-warning" /> : <MoonIcon size={18} />}
+          </button>
         </div>
       </div>
 

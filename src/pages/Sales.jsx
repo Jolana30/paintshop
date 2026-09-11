@@ -3,13 +3,15 @@ import { useStock } from '../context/StockContext';
 import {
   ReceiptTextIcon,
   SearchIcon,
-  ShoppingCartIcon
+  ShoppingCartIcon,
+  SunIcon,
+  MoonIcon
 } from '../components/Icons';
 import { downloadExcelCsv } from '../utils/exportExcel';
 import { printOrSaveAsPdf, printSaleReceipt } from '../utils/exportPdf';
 
 export default function Sales({ setActiveTab, initialDate = '', onClearDateFilter }) {
-  const { sales, formatCurrency, updateSaleWhtVoucher, currentShop } = useStock();
+  const { sales, formatCurrency, updateSaleWhtVoucher, currentShop, isDarkMode, toggleTheme } = useStock();
   const [editingVoucherSale, setEditingVoucherSale] = useState(null);
   const [inputVoucherNo, setInputVoucherNo] = useState('');
   const [inputVoucherStatus, setInputVoucherStatus] = useState('received');
@@ -262,6 +264,15 @@ export default function Sales({ setActiveTab, initialDate = '', onClearDateFilte
           >
             <ShoppingCartIcon size={18} />
             + New Sale
+          </button>
+          <button
+            type="button"
+            className="btn-theme-toggle-icon"
+            onClick={toggleTheme}
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDarkMode ? <SunIcon size={18} className="text-warning" /> : <MoonIcon size={18} />}
           </button>
         </div>
       </div>

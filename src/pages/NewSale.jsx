@@ -8,11 +8,13 @@ import {
   ShoppingCartIcon,
   CheckCircleIcon,
   RefreshCwIcon,
-  PackageIcon
+  PackageIcon,
+  SunIcon,
+  MoonIcon
 } from '../components/Icons';
 
 export default function NewSale({ setActiveTab }) {
-  const { products, processSale, formatCurrency, refreshData, showToast } = useStock();
+  const { products, processSale, formatCurrency, refreshData, showToast, isDarkMode, toggleTheme } = useStock();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -345,6 +347,15 @@ export default function NewSale({ setActiveTab }) {
             onClick={() => setActiveTab('sales')}
           >
             View Sales History ➔
+          </button>
+          <button
+            type="button"
+            className="btn-theme-toggle-icon"
+            onClick={toggleTheme}
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDarkMode ? <SunIcon size={18} className="text-warning" /> : <MoonIcon size={18} />}
           </button>
         </div>
       </div>

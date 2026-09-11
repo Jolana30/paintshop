@@ -4,11 +4,13 @@ import {
   ArrowDownToDotIcon,
   CheckCircleIcon,
   SearchIcon,
-  PackageIcon
+  PackageIcon,
+  SunIcon,
+  MoonIcon
 } from '../components/Icons';
 
 export default function StockIn({ preselectedProductId, setActiveTab }) {
-  const { products, processStockIn, movements } = useStock();
+  const { products, processStockIn, movements, isDarkMode, toggleTheme } = useStock();
 
   const [selectedProductId, setSelectedProductId] = useState(preselectedProductId || (products[0]?.id || ''));
   const [quantity, setQuantity] = useState('');
@@ -74,6 +76,17 @@ export default function StockIn({ preselectedProductId, setActiveTab }) {
         <div>
           <h1 className="page-title">Stock In (Receive Inventory)</h1>
           <p className="page-subtitle">Record incoming Jotun paint shipments — automatically added to stock</p>
+        </div>
+        <div className="header-actions-group">
+          <button
+            type="button"
+            className="btn-theme-toggle-icon"
+            onClick={toggleTheme}
+            title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          >
+            {isDarkMode ? <SunIcon size={18} className="text-warning" /> : <MoonIcon size={18} />}
+          </button>
         </div>
       </div>
 
